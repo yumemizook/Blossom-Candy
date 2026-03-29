@@ -17,6 +17,9 @@ end
 
 local W = GetBCWindows()  -- computed once at load; values are in ms
 
+-- Marvelous "perfect" zone: 0-4.5ms fixed at 1.00
+local MARVELOUS_MAX_MS = 4.5
+
 -- Smoothstep cubic ease: t in [t_min, t_max] → [s_max, s_min]
 local function cubicEase(t, t_min, t_max, s_max, s_min)
   local x = (t - t_min) / (t_max - t_min)
@@ -42,13 +45,17 @@ function BCNoteScore(offsetSeconds)
   end
   local t = math.abs(offsetSeconds) * 1000  -- convert to ms for comparison with W.*
 
-  if t <= W.W1 then
-    -- Marvelous: cubic 1.00 → 0.99
-    return cubicEase(t, 0, W.W1, 1.00, 0.99)
+  if t <= MARVELOUS_MAX_MS then
+    -- Marvelous (max): fixed 1.00 for 0-4.5ms
+    return 1.00
+
+  elseif t <= W.W1 then
+    -- Marvelous (decay): cubic 1.00 → 0.97 for 4.5-22.5ms
+    return cubicEase(t, MARVELOUS_MAX_MS, W.W1, 1.00, 0.97)
 
   elseif t <= W.W2 then
-    -- Perfect: cubic 0.99 → 0.80
-    return cubicEase(t, W.W1, W.W2, 0.99, 0.80)
+    -- Perfect: cubic 0.97 → 0.80 for 22.5-45ms
+    return cubicEase(t, W.W1, W.W2, 0.97, 0.80)
 
   elseif t <= greatZero then
     -- Great (positive half): cubic 0.80 → 0.00
@@ -116,8 +123,9 @@ end
 
 -- Curve Summary (at J4 defaults):
 -- | Offset (abs) | Judgment | Score | Shape |
--- | 0 – 22.5ms | Marvelous | 1.00 → 0.99 | Cubic |
--- | 22.5 – 45ms | Perfect | 0.99 → 0.80 | Cubic |
+-- | 0 – 4.5ms | Marvelous (max) | 1.00 | Fixed |
+-- | 4.5 – 22.5ms | Marvelous (decay) | 1.00 → 0.97 | Cubic |
+-- | 22.5 – 45ms | Perfect | 0.97 → 0.80 | Cubic |
 -- | 45 – 67.5ms | Great (pos.) | 0.80 → 0.00 | Cubic |
 -- | 67.5 – 90ms | Great (neg.) | 0.00 → −0.75 | Linear |
 -- | 90 – 135ms | Good | −0.75 → −1.50 | Linear |

@@ -176,7 +176,7 @@ end
                     SOUND:PlayOnce(THEME:GetPathS("Common", "start"))
                     local choice = choices[currentChoice]
                     if choice == "Play" then
-                        GAMESTATE:ApplyGameCommand("applydefaultoptions;screen,ScreenSelectMusic")
+                        GAMESTATE:ApplyGameCommand("applydefaultoptions;screen,ScreenProfileLoad")
                     elseif choice == "Options" then
                         GAMESTATE:ApplyGameCommand("screen,ScreenOptionsService")
                     elseif choice == "Exit" then

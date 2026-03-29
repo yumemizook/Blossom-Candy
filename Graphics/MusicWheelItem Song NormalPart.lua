@@ -7,34 +7,14 @@ local t = Def.ActorFrame {
   end
 }
 
--- Background Pill (clean, semi-transparent)
+-- Background Pill (clean, semi-transparent, uniform appearance)
 t[#t+1] = Def.Quad {
   InitCommand = function(self)
     self:setsize(340, 40)
         :align(0, 0.5)
         :diffuse(BCColors.panel)
-        :diffusealpha(0.6)
-  end,
-   SetCommand = function(self, params)
-     if params.HasFocus then
-       self:diffusealpha(0.8):diffuse(BCColors.accent)
-     else
-       self:diffusealpha(0.4):diffuse(BCColors.panel)
-     end
-   end
-}
-
--- Selection Indicator (left side line)
-t[#t+1] = Def.Quad {
-  InitCommand = function(self)
-    self:setsize(4, 40)
-        :align(0, 0.5)
-        :diffuse(BCColors.accent)
-        :visible(false)
-  end,
-   SetCommand = function(self, params)
-     self:visible(params and params.HasFocus or false)
-   end
+        :diffusealpha(0.5)
+  end
 }
 
 -- Song Title

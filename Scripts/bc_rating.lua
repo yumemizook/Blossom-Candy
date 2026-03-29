@@ -406,14 +406,14 @@ local function BCAnalyzeIntervals(notes)
   local techRaw = AggregateIntervals(techIntervals)
   
   local function RawToStars(raw)
-    -- Linear scaling compressed with the requested 15% calc-wide reduction
-    local stars = (raw / 3.5) * 0.85
+    -- Linear scaling compressed with the requested 18% calc-wide reduction
+    local stars = (raw / 3.5) * 0.82
     
     -- Powerful logarithmic compression starting at 9.0 Stars
     if stars > 9.0 then
       stars = 9.0 + 4.0 * math.log((stars - 9.0) / 4.0 + 1.0)
     end
-    if stars < 1.0 then stars = 1.0 end
+    if stars < 0 then stars = 0 end
     return stars
   end
 
@@ -451,8 +451,8 @@ function BCComputeRating(steps, song)
   if not totalNotes or totalNotes <= 0 or songLength <= 0 then return {Overall=1.0, Stream=1.0, Jack=1.0, Tech=1.0, Stamina=1.0} end
   
   local avgNPS = totalNotes / songLength
-  local stars = (avgNPS / 1.2) * 0.85
-  if stars < 1.0 then stars = 1.0 end
+  local stars = (avgNPS / 1.2) * 0.82
+  if stars < 0 then stars = 0 end
   return {
     Overall = stars,
     Stream = stars,
