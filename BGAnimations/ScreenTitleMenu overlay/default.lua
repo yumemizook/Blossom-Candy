@@ -137,27 +137,72 @@ t[#t+1] = LoadFont("hatsukoi 24px") .. {
   end
 }
 
--- "Press any key to start" prompt
-t[#t+1] = LoadFont("hatsukoi Bold 48px") .. {
-  InitCommand = function(self)
-    self:x(SCREEN_CENTER_X)
-        :y(SCREEN_HEIGHT - 80)
-        :settext("press any key to start")
-        :diffuse(BCColors.textMuted)
-        :zoom(0.383)
-  end,
-  OnCommand = function(self)
-    self:diffusealpha(0.4)
-        -- Slow sine-wave opacity blink (~2.5s period)
-        :queuecommand("Blink")
-  end,
-  BlinkCommand = function(self)
-    self:smooth(1.25)
-        :diffusealpha(0.9)
-        :smooth(1.25)
-        :diffusealpha(0.4)
-        :queuecommand("Blink")
-  end
+-- Title screen menu options
+local choices = {"Play", "Options", "Exit"}
+local currentChoice = 1
+
+local function updateMenu(self)
+    for i = 1, #choices do
+        local item = self:GetChild("Choice" .. i)
+        if i == currentChoice then
+            item:stopeffect():glow(1,1,1,0.2):zoom(0.45):diffuse(BCColors.accent)
+        else
+            item:stopeffect():glow(1,1,1,0):zoom(0.383):diffuse(BCColors.textMuted)
+        end
+    end
+end
+
+    local leaving = false
+    t[#t+1] = Def.ActorFrame {
+    Name = "MenuFrame",
+    InitCommand = function(self)
+        self:x(SCREEN_CENTER_X):y(SCREEN_HEIGHT - 100)
+    end,
+    OnCommand = function(self)
+        updateMenu(self)
+        SCREENMAN:GetTopScreen():AddInputCallback(function(event)
+            if leaving then return end
+            if event.type == "InputEventType_FirstPress" then
+                if event.GameButton == "MenuLeft" or event.GameButton == "MenuUp" then
+                    currentChoice = math.max(1, currentChoice - 1)
+                    SOUND:PlayOnce(THEME:GetPathS("_common", "row"))
+                    updateMenu(self)
+                elseif event.GameButton == "MenuRight" or event.GameButton == "MenuDown" then
+                    currentChoice = math.min(#choices, currentChoice + 1)
+                    SOUND:PlayOnce(THEME:GetPathS("_common", "row"))
+                    updateMenu(self)
+                elseif event.GameButton == "Start" then
+                    leaving = true
+                    SOUND:PlayOnce(THEME:GetPathS("Common", "start"))
+                    local choice = choices[currentChoice]
+                    if choice == "Play" then
+                        GAMESTATE:ApplyGameCommand("applydefaultoptions;screen,ScreenSelectMusic")
+                    elseif choice == "Options" then
+                        GAMESTATE:ApplyGameCommand("screen,ScreenOptionsService")
+                    elseif choice == "Exit" then
+                        GAMESTATE:ApplyGameCommand("screen,ScreenExit")
+                    end
+                end
+            end
+        end)
+    end,
+
+    -- Menu Items
+    LoadFont("hatsukoi Bold 48px") .. {
+        Name = "Choice1",
+        Text = "PLAY",
+        InitCommand = function(self) self:x(-120) end
+    },
+    LoadFont("hatsukoi Bold 48px") .. {
+        Name = "Choice2",
+        Text = "OPTIONS",
+        InitCommand = function(self) self:x(0) end
+    },
+    LoadFont("hatsukoi Bold 48px") .. {
+        Name = "Choice3",
+        Text = "EXIT",
+        InitCommand = function(self) self:x(120) end
+    }
 }
 
 -- Version string (bottom-right)

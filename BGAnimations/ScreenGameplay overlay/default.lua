@@ -119,11 +119,37 @@ t[#t+1] = Def.Sprite {
     self:Center()
         :y(SCREEN_CENTER_Y + 80)
         :animate(false)
-        :zoom(0.68)
+        :zoom(0.45)
         :diffusealpha(0)
   end,
   JudgmentMessageCommand = function(self, param)
-    if param.HoldNoteScore then return end
+    -- Handle Hold/Roll drops (scoring only, no sprite)
+    if param.HoldNoteScore then
+      local hns = param.HoldNoteScore
+      -- LetGo = dropped hold/roll
+      if hns == 'HoldNoteScore_LetGo' then
+        BCState:AddHoldRollDrop()
+        Wife3State:AddHoldRollDrop()
+        EXState:AddHoldRollDrop()
+        SimpleState:AddHoldRollDrop()
+      end
+      return
+    end
+    
+    -- Handle Mines (scoring only, no sprite)
+    if param.TapNoteScore == 'TapNoteScore_HitMine' then
+      BCState:AddMineHit()
+      Wife3State:AddMineHit()
+      EXState:AddMineHit()
+      SimpleState:AddMineHit()
+      return
+    end
+    
+    -- AvoidMine = successfully avoided, no score impact
+    if param.TapNoteScore == 'TapNoteScore_AvoidMine' then
+      return
+    end
+    
     if param.Player ~= PLAYER_1 then return end
 
     local rowMap = {
@@ -135,20 +161,28 @@ t[#t+1] = Def.Sprite {
       TapNoteScore_Miss = 5,
     }
     local row = rowMap[param.TapNoteScore] or 5
+    
     -- Left Column (0) = Early, Right Column (1) = Late
-    -- Check if offset exists (Miss has no offset)
-    local col = (param.TapNoteOffset and param.TapNoteOffset < 0) and 0 or 1
+    -- For Marvelous (W1), always show center style or use offset if available
+    local col = 1  -- default to late/right
+    if param.TapNoteOffset ~= nil then
+      if param.TapNoteOffset < 0 then
+        col = 0  -- early/left
+      else
+        col = 1  -- late/right
+      end
+    end
 
     self:setstate(row * 2 + col)
         :finishtweening()
-        :zoom(0.978)
+        :zoom(0.65)
         :diffusealpha(1)
         :decelerate(0.1)
-        :zoom(0.85)
+        :zoom(0.5)
         :decelerate(0.5)
-        :addy(-20)
+        :addy(-15)
         :diffusealpha(0)
-        :addy(20)  -- reset position
+        :addy(15)  -- reset position
 
     -- Accumulate BlossomCandy Score
     local isMiss = (param.TapNoteScore == 'TapNoteScore_Miss')
@@ -166,7 +200,7 @@ t[#t+1] = Def.ActorFrame {
   Name = "ComboDisplay",
   InitCommand = function(self)
     self:Center()
-        :y(SCREEN_CENTER_Y + 130)
+        :y(SCREEN_CENTER_Y + 120)
         :diffusealpha(0)
   end,
 
@@ -177,10 +211,29 @@ t[#t+1] = Def.ActorFrame {
       self:align(0.5, 0.5)
           :settext("0")
           :diffuse(1, 1, 1, 1)
-          :zoom(0.85)
+          :zoom(0.5)
     end,
     JudgmentMessageCommand = function(self, param)
-      if param.HoldNoteScore then return end
+      -- Handle Hold/Roll drops - update combo display
+      if param.HoldNoteScore then
+        local hns = param.HoldNoteScore
+        if hns == 'HoldNoteScore_LetGo' then
+          local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats(PLAYER_1)
+          if pss then
+            local combo = pss:GetCurrentCombo()
+            self:settext(tostring(combo))
+                :diffuse(1, 1, 1, 1)
+          end
+        end
+        return
+      end
+      
+      -- Skip mines for combo display
+      if param.TapNoteScore == 'TapNoteScore_HitMine' or 
+         param.TapNoteScore == 'TapNoteScore_AvoidMine' then
+        return
+      end
+      
       if param.Player ~= PLAYER_1 then return end
 
       local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats(PLAYER_1)
@@ -200,9 +253,9 @@ t[#t+1] = Def.ActorFrame {
         -- Scale bump on combo hit
         if combo > 0 and param.TapNoteScore ~= 'TapNoteScore_Miss' then
           self:finishtweening()
-              :zoom(1.02)
+              :zoom(0.6)
               :decelerate(0.1)
-              :zoom(0.85)
+              :zoom(0.5)
         end
       end
     end
@@ -212,14 +265,28 @@ t[#t+1] = Def.ActorFrame {
   LoadFont("hatsukoi 48px") .. {
     Name = "Milestone",
     InitCommand = function(self)
-      self:y(-35)
+      self:y(-25)
           :settext("✦")
           :diffuse(1, 0.92, 0.6, 1)
-          :zoom(0.425)
+          :zoom(0.3)
           :diffusealpha(0)
     end,
     JudgmentMessageCommand = function(self, param)
-      if param.HoldNoteScore then return end
+      -- Handle Hold/Roll drops - hide milestone on combo break
+      if param.HoldNoteScore then
+        local hns = param.HoldNoteScore
+        if hns == 'HoldNoteScore_LetGo' then
+          self:diffusealpha(0)
+        end
+        return
+      end
+      
+      -- Skip mines for milestone display
+      if param.TapNoteScore == 'TapNoteScore_HitMine' or 
+         param.TapNoteScore == 'TapNoteScore_AvoidMine' then
+        return
+      end
+      
       if param.Player ~= PLAYER_1 then return end
 
       if param.TapNoteScore == 'TapNoteScore_Miss' then
@@ -234,9 +301,9 @@ t[#t+1] = Def.ActorFrame {
         if combo == 100 or combo == 200 or combo == 500 or combo == 1000 then
           self:finishtweening()
               :diffusealpha(1)
-              :zoom(0.68)
+              :zoom(0.45)
               :decelerate(0.2)
-              :zoom(0.425)
+              :zoom(0.3)
         end
       end
     end
@@ -386,6 +453,11 @@ t[#t+1] = Def.Quad {
 -- Song Started / Ended hooks
 -- ============================================================================
 t[#t+1] = Def.ActorFrame {
+  InitCommand = function(self)
+    -- Reset immediately on screen init (before SongStarted fires)
+    BCResetAllAccumulators()
+  end,
+  
   SongStartedMessageCommand = function(self)
     -- Reset all accumulators
     BCResetAllAccumulators()

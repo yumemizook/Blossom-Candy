@@ -11,6 +11,7 @@ local DefaultBCPrefs = {
   autoPreview     = true,        -- auto-preview songs in song select
   previewDelay    = 1.2,         -- seconds before preview starts
   themeVersion    = "1.0.0",
+  lastProfileId   = nil,         -- last selected profile ID (nil for guest)
 }
 
 -- Active preferences (loaded from file or defaults)

@@ -11,8 +11,14 @@ t[#t+1] = Def.Quad {
   end
 }
 
--- Get stats once
-local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats(PLAYER_1)
+-- Helper to get stats at runtime (not file load)
+local function GetPlayerStageStats()
+  local stageStats = STATSMAN:GetCurStageStats()
+  if stageStats then
+    return stageStats:GetPlayerStageStats(PLAYER_1)
+  end
+  return nil
+end
 
 -- ============================================================================
 -- Main Evaluation Card (centered)
@@ -76,42 +82,56 @@ t[#t+1] = Def.ActorFrame {
     InitCommand = function(self)
       self:y(-120)
     end,
-    OnCommand = function(self)
-      local steps = GAMESTATE:GetCurrentSteps(PLAYER_1)
-      local song = GAMESTATE:GetCurrentSong()
-      if steps and song then
-        local diff = steps:GetDifficulty()
-        local diffName = ToEnumShortString(diff)
-        local stars = steps:GetMeter()
-        local ratingTable = nil
-        if BCGetRating then
-          ratingTable = BCGetRating(steps, song)
-          stars = type(ratingTable) == "table" and ratingTable.Overall or ratingTable or stars
-        end
-        local color = BCColors.perfect
-        if BCGetRatingColor then
-          color = BCGetRatingColor(stars)
-        end
 
-        -- Background pill
-        self:AddChild(Def.Quad {
-          InitCommand = function(q)
-            q:setsize(140, 28)
-                :align(0.5, 0.5)
-                :diffuse(color)
+    -- Background pill
+    Def.Quad {
+      Name = "DiffBG",
+      InitCommand = function(self)
+        self:setsize(140, 28)
+            :align(0.5, 0.5)
+            :diffuse(BCColors.panel)
+      end,
+      OnCommand = function(self)
+        local steps = GAMESTATE:GetCurrentSteps(PLAYER_1)
+        local song = GAMESTATE:GetCurrentSong()
+        if steps and song then
+          local stars = steps:GetMeter()
+          if BCGetRating then
+            local ratingTable = BCGetRating(steps, song)
+            stars = type(ratingTable) == "table" and ratingTable.Overall or ratingTable or stars
           end
-        })
-
-        -- Difficulty text
-        self:AddChild(LoadFont("hatsukoi 48px") .. {
-          InitCommand = function(txt)
-            txt:settext(diffName .. " " .. string.format("%.2f★", stars))
-                :diffuse(BCColors.text)
-                :zoom(0.34)
+          local color = BCColors.perfect
+          if BCGetRatingColor then
+            color = BCGetRatingColor(stars)
           end
-        })
+          self:diffuse(color)
+        end
       end
-    end
+    },
+
+    -- Difficulty text
+    LoadFont("hatsukoi 48px") .. {
+      Name = "DiffText",
+      InitCommand = function(self)
+        self:settext("")
+            :diffuse(BCColors.text)
+            :zoom(0.34)
+      end,
+      OnCommand = function(self)
+        local steps = GAMESTATE:GetCurrentSteps(PLAYER_1)
+        local song = GAMESTATE:GetCurrentSong()
+        if steps and song then
+          local diff = steps:GetDifficulty()
+          local diffName = ToEnumShortString(diff)
+          local stars = steps:GetMeter()
+          if BCGetRating then
+            local ratingTable = BCGetRating(steps, song)
+            stars = type(ratingTable) == "table" and ratingTable.Overall or ratingTable or stars
+          end
+          self:settext(diffName .. " " .. string.format("%.2f★", stars))
+        end
+      end
+    }
   },
 
   -- Grade Display (large)
@@ -124,7 +144,6 @@ t[#t+1] = Def.ActorFrame {
           :diffusealpha(0)
     end,
     OnCommand = function(self)
-      -- Get grade from BC% (or Wife3% if that mode is active)
       local pct = BCState:GetPercent()
       local label, color = BCGradeFromPercent(pct)
 
@@ -137,7 +156,6 @@ t[#t+1] = Def.ActorFrame {
           :decelerate(0.35)
           :zoom(1.275)
           :diffusealpha(1)
-          -- Spring overshoot
           :decelerate(0.15)
           :zoom(0.884)
           :decelerate(0.1)
@@ -185,6 +203,7 @@ t[#t+1] = Def.ActorFrame {
             :zoom(0.425)
       end,
       OnCommand = function(self)
+        local pss = GetPlayerStageStats()
         if pss then
           local dp = pss:GetPercentDancePoints() * 100
           self:settext(string.format("DP: %.2f%%", dp))
@@ -198,83 +217,107 @@ t[#t+1] = Def.ActorFrame {
     InitCommand = function(self)
       self:y(110)
     end,
-    OnCommand = function(self)
-      if not pss then return end
 
-      local counts = {
-        w1 = pss:GetTapNoteScores('TapNoteScore_W1'),
-        w2 = pss:GetTapNoteScores('TapNoteScore_W2'),
-        w3 = pss:GetTapNoteScores('TapNoteScore_W3'),
-        w4 = pss:GetTapNoteScores('TapNoteScore_W4'),
-        w5 = pss:GetTapNoteScores('TapNoteScore_W5'),
-        ms = pss:GetTapNoteScores('TapNoteScore_Miss'),
-      }
-      local maxCombo = pss:GetMaxCombo()
-
-      local labels = {
-        { "Marvelous", counts.w1, BCColors.marvelous },
-        { "Perfect",   counts.w2, BCColors.perfect },
-        { "Great",     counts.w3, BCColors.great },
-        { "Good",      counts.w4, BCColors.good },
-        { "Bad",       counts.w5, BCColors.bad },
-        { "Miss",      counts.ms, BCColors.miss },
-        { "Max Combo", maxCombo,  BCColors.accent },
-      }
-
-      local xOffset = -150
-      for i, data in ipairs(labels) do
-        local label, count, color = data[1], data[2], data[3]
-
-        -- Label
-        self:AddChild(LoadFont("hatsukoi 48px") .. {
-          InitCommand = function(txt)
-            txt:xy(xOffset, (i-1) * 22)
-                :align(0, 0.5)
-                :settext(label)
-                :diffuse(color)
-                :zoom(0.298)
-          end
-        })
-
-        -- Count (animated)
-        self:AddChild(LoadFont("hatsukoi 24px") .. {
-          InitCommand = function(txt)
-            txt:xy(xOffset + 120, (i-1) * 22)
-                :align(1, 0.5)
-                :settext("0")
-                :diffuse(BCColors.text)
-                :zoom(0.34)
-          end,
-          OnCommand = function(txt)
-            local current = 0
-            local target = count
-            local duration = 1.0
-            local steps = 30
-            local stepTime = duration / steps
-            local increment = target / steps
-
-            txt:sleep(0.5 + i * 0.05)
-
-            for s = 1, steps do
-              txt:sleep(stepTime)
-                   :queuecommand("Increment")
-            end
-
-            txt.SetCountCommand = function(subself)
-              current = math.min(target, current + increment)
-              subself:settext(math.floor(current))
-            end
-          end,
-          IncrementCommand = function(txt)
-            txt:playcommand("SetCount")
-          end
-        })
+    -- Label row 1: Marvelous
+    LoadFont("hatsukoi 48px") .. {
+      InitCommand = function(self) self:xy(-150, 0):align(0, 0.5):zoom(0.298):settext("Marvelous"):diffuse(BCColors.marvelous) end
+    },
+    LoadFont("hatsukoi 24px") .. {
+      InitCommand = function(self) self:xy(-30, 0):align(1, 0.5):settext("0"):diffuse(BCColors.text):zoom(0.34) end,
+      OnCommand = function(self)
+        local pss = GetPlayerStageStats()
+        if not pss then return end
+        local target = pss:GetTapNoteScores('TapNoteScore_W1')
+        self:sleep(0.5):linear(1):settext(tostring(target))
       end
-    end
-  },
+    },
 
-  -- Life graph placeholder (would go here if enabled)
-  -- SM5 provides GetLifeRecord for this
+    -- Label row 2: Perfect
+    LoadFont("hatsukoi 48px") .. {
+      InitCommand = function(self) self:xy(-150, 22):align(0, 0.5):zoom(0.298):settext("Perfect"):diffuse(BCColors.perfect) end
+    },
+    LoadFont("hatsukoi 24px") .. {
+      InitCommand = function(self) self:xy(-30, 22):align(1, 0.5):settext("0"):diffuse(BCColors.text):zoom(0.34) end,
+      OnCommand = function(self)
+        local pss = GetPlayerStageStats()
+        if not pss then return end
+        local target = pss:GetTapNoteScores('TapNoteScore_W2')
+        self:sleep(0.55):linear(1):settext(tostring(target))
+      end
+    },
+
+    -- Label row 3: Great
+    LoadFont("hatsukoi 48px") .. {
+      InitCommand = function(self) self:xy(-150, 44):align(0, 0.5):zoom(0.298):settext("Great"):diffuse(BCColors.great) end
+    },
+    LoadFont("hatsukoi 24px") .. {
+      InitCommand = function(self) self:xy(-30, 44):align(1, 0.5):settext("0"):diffuse(BCColors.text):zoom(0.34) end,
+      OnCommand = function(self)
+        local pss = GetPlayerStageStats()
+        if not pss then return end
+        local target = pss:GetTapNoteScores('TapNoteScore_W3')
+        self:sleep(0.6):linear(1):settext(tostring(target))
+      end
+    },
+
+    -- Label row 4: Good
+    LoadFont("hatsukoi 48px") .. {
+      InitCommand = function(self) self:xy(-150, 66):align(0, 0.5):zoom(0.298):settext("Good"):diffuse(BCColors.good) end
+    },
+    LoadFont("hatsukoi 24px") .. {
+      InitCommand = function(self) self:xy(-30, 66):align(1, 0.5):settext("0"):diffuse(BCColors.text):zoom(0.34) end,
+      OnCommand = function(self)
+        local pss = GetPlayerStageStats()
+        if not pss then return end
+        local target = pss:GetTapNoteScores('TapNoteScore_W4')
+        self:sleep(0.65):linear(1):settext(tostring(target))
+      end
+    },
+
+    -- Label row 5: Bad
+    LoadFont("hatsukoi 48px") .. {
+      InitCommand = function(self) self:xy(-150, 88):align(0, 0.5):zoom(0.298):settext("Bad"):diffuse(BCColors.bad) end
+    },
+    LoadFont("hatsukoi 24px") .. {
+      InitCommand = function(self) self:xy(-30, 88):align(1, 0.5):settext("0"):diffuse(BCColors.text):zoom(0.34) end,
+      OnCommand = function(self)
+        local pss = GetPlayerStageStats()
+        if not pss then return end
+        local target = pss:GetTapNoteScores('TapNoteScore_W5')
+        self:sleep(0.7):linear(1):settext(tostring(target))
+      end
+    },
+
+    -- Label row 6: Miss
+    LoadFont("hatsukoi 48px") .. {
+      InitCommand = function(self) self:xy(-150, 110):align(0, 0.5):zoom(0.298):settext("Miss"):diffuse(BCColors.miss) end
+    },
+    LoadFont("hatsukoi 24px") .. {
+      InitCommand = function(self) self:xy(-30, 110):align(1, 0.5):settext("0"):diffuse(BCColors.text):zoom(0.34) end,
+      OnCommand = function(self)
+        local pss = GetPlayerStageStats()
+        if not pss then return end
+        local target = pss:GetTapNoteScores('TapNoteScore_Miss')
+        self:sleep(0.75):linear(1):settext(tostring(target))
+      end
+    },
+
+    -- Label row 7: Max Combo
+    LoadFont("hatsukoi 48px") .. {
+      InitCommand = function(self) self:xy(-150, 132):align(0, 0.5):zoom(0.298):settext("Max Combo"):diffuse(BCColors.accent) end
+    },
+    LoadFont("hatsukoi 24px") .. {
+      InitCommand = function(self) self:xy(-30, 132):align(1, 0.5):settext("0"):diffuse(BCColors.text):zoom(0.34) end,
+      OnCommand = function(self)
+        local pss = GetPlayerStageStats()
+        if pss == nil then return end
+        local maxComboFn = pss.GetMaxCombo
+        if maxComboFn == nil then return end
+        local target = maxComboFn(pss) or 0
+        self:sleep(0.8):linear(1):settext(tostring(target))
+      end
+    }
+  },
 
   -- Footer buttons info
   LoadFont("hatsukoi 24px") .. {
@@ -320,9 +363,10 @@ if BCGetPref("showLifeGraph") then
       end
     },
 
-    -- Life line (simple representation)
+    -- Life line
     Def.ActorMultiVertex {
       OnCommand = function(self)
+        local pss = GetPlayerStageStats()
         if not pss then return end
 
         local song = GAMESTATE:GetCurrentSong()
@@ -352,7 +396,7 @@ if BCGetPref("showLifeGraph") then
 end
 
 -- ============================================================================
--- Footer buttons (visual representation)
+-- Footer buttons
 -- ============================================================================
 t[#t+1] = Def.ActorFrame {
   InitCommand = function(self)
@@ -384,9 +428,6 @@ t[#t+1] = Def.ActorFrame {
 
   -- Song Select button
   Def.ActorFrame {
-    InitCommand = function(self)
-    end,
-
     Def.Quad {
       InitCommand = function(self)
         self:setsize(120, 36)

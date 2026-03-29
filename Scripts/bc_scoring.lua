@@ -71,6 +71,18 @@ function Wife3State:AddJudgment(offsetSeconds, isMiss)
   end
 end
 
+-- Hold/Roll Drop: -4.5 penalty
+function Wife3State:AddHoldRollDrop()
+  self.totalNotes = self.totalNotes + 1
+  self.raw = self.raw - 4.5
+end
+
+-- Mine Hit: -7.0 penalty
+function Wife3State:AddMineHit()
+  self.totalNotes = self.totalNotes + 1
+  self.raw = self.raw - 7.0
+end
+
 function Wife3State:GetPercent()
   if self.totalNotes == 0 then return 0 end
   -- Normalize by max possible (2.0 per note)
@@ -79,14 +91,14 @@ end
 
 -- Wife3 Grade Thresholds (from Etterna _fallback/Scripts/10 Scores.lua)
 Wife3Grades = {
-  { 99.9700, "AAAA", "gradeBlossom" },
-  { 99.9000, "AAA",  "gradeSPlus"   },
-  { 99.0000, "AA",   "gradeS"       },
-  { 96.5000, "A",    "gradeA"       },
-  { 93.0000, "B",    "gradeB"       },
-  { 85.0000, "C",    "gradeC"       },
-  { 70.0000, "D",    "gradeD"       },
-  {  0.0000, "F",    "gradeDMinus"  },
+  { 99.9935, "AAAAA", "gradeBlossom" },
+  { 99.9550, "AAAA", "gradeSPlus" },
+  { 99.7000, "AAA",  "gradeS"   },
+  { 93.0000, "AA",   "gradeA"       },
+  { 80.0000, "A",    "gradeB"       },
+  { 70.0000, "B",    "gradeC"       },
+  { 60.0000, "C",    "gradeD"       },
+  { 0.0000, "D",    "gradeDminus"       },
 }
 
 function Wife3GradeFromPercent(pct)
@@ -123,6 +135,15 @@ function EXState:AddJudgment(tns)
   self.score = self.score + points
 end
 
+-- Hold/Roll Drop and Mine Hit: 0 points, just count the note
+function EXState:AddHoldRollDrop()
+  self.totalNotes = self.totalNotes + 1
+end
+
+function EXState:AddMineHit()
+  self.totalNotes = self.totalNotes + 1
+end
+
 function EXState:GetScore()
   return self.score
 end
@@ -156,6 +177,17 @@ function SimpleState:AddJudgment(tns)
   if tns ~= 'TapNoteScore_Miss' then
     self.hits = self.hits + 1
   end
+end
+
+-- Hold/Roll Drop and Mine Hit: count as miss (no hit)
+function SimpleState:AddHoldRollDrop()
+  self.totalNotes = self.totalNotes + 1
+  -- counts as miss, no hit increment
+end
+
+function SimpleState:AddMineHit()
+  self.totalNotes = self.totalNotes + 1
+  -- counts as miss, no hit increment
 end
 
 function SimpleState:GetPercent()

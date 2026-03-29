@@ -37,6 +37,9 @@ local greatZero = W.W2 + (W.W3 - W.W2) / 2
 -- Compute score for a single note based on offset (in seconds)
 -- Returns raw score value (can be negative)
 function BCNoteScore(offsetSeconds)
+  if offsetSeconds == nil then
+    return -2.50  -- Treat nil offset as miss
+  end
   local t = math.abs(offsetSeconds) * 1000  -- convert to ms for comparison with W.*
 
   if t <= W.W1 then
@@ -87,7 +90,23 @@ end
 
 function BCState:AddJudgment(offsetSeconds, isMiss)
   self.totalNotes = self.totalNotes + 1
-  self.raw = self.raw + (isMiss and -2.50 or BCNoteScore(offsetSeconds))
+  if isMiss or offsetSeconds == nil then
+    self.raw = self.raw - 2.50
+  else
+    self.raw = self.raw + BCNoteScore(offsetSeconds)
+  end
+end
+
+-- Hold/Roll Drop: treated as Miss (-2.50)
+function BCState:AddHoldRollDrop()
+  self.totalNotes = self.totalNotes + 1
+  self.raw = self.raw - 2.50
+end
+
+-- Mine Hit: -3.0 penalty
+function BCState:AddMineHit()
+  self.totalNotes = self.totalNotes + 1
+  self.raw = self.raw - 3.00
 end
 
 function BCState:GetPercent()
