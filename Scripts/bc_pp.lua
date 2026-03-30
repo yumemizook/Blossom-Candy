@@ -91,26 +91,62 @@ end
 -- Data Persistence
 -- ============================================================================
 
-local PROFILE_PATH = "Save/BCProfileData.lua"
+-- ============================================================================
+-- Profile Data Path (Profile-Specific)
+-- ============================================================================
+
+local function GetBCProfileDataPath()
+  if PROFILEMAN then
+    for _, pn in ipairs({PLAYER_1, PLAYER_2}) do
+      if PROFILEMAN:IsPersistentProfile(pn) then
+        -- Construct path using player number (API doesn't expose profile ID directly)
+        local playerStr = (pn == PLAYER_1) and "P1" or "P2"
+        return "Save/LocalProfiles/Player_" .. playerStr .. "/BCProfileData.lua"
+      end
+    end
+  end
+  -- Fallback to global Save folder (guest/no profile)
+  return "Save/BCProfileData.lua"
+end
+
+-- Legacy path for migration
+local LEGACY_PROFILE_PATH = "Save/BCProfileData.lua"
 
 function LoadBCProfile()
-  local chunk = loadfile(PROFILE_PATH)
+  local path = GetBCProfileDataPath()
+  local chunk = loadfile(path)
   if chunk then
     return chunk()
   end
+  
+  -- Migration: try legacy path if profile path doesn't exist
+  if path ~= LEGACY_PROFILE_PATH then
+    local legacyChunk = loadfile(LEGACY_PROFILE_PATH)
+    if legacyChunk then
+      local data = legacyChunk()
+      -- Save to new location for future loads
+      SaveBCProfile(data)
+      return data
+    end
+  end
+  
   return { totalBP = 0, scores = {} }
 end
 
 function SaveBCProfile(profile)
+  local path = GetBCProfileDataPath()
   local f = RageFileUtil.CreateRageFile()
-  if f:Open(PROFILE_PATH, RageFile.WRITE) then
+  if not f then return end
+  if f:Open(path, 2) then  -- 2 = WRITE
     local out = "return {\n"
     out = out .. string.format("  totalBP = %.4f,\n", profile.totalBP)
     out = out .. "  scores = {\n"
     for key, entry in pairs(profile.scores) do
       out = out .. string.format(
-        "    [%q] = { rawBP=%.4f, bcPct=%.4f, bloomRating=%.2f, grade=%q, rateString=%q },\n",
-        key, entry.rawBP, entry.bcPct, entry.bloomRating, entry.grade, entry.rateString
+        "    [%q] = { rawBP=%.4f, bcPct=%.4f, bloomRating=%.2f, grade=%q, rateString=%q, dpPct=%.4f, wife3Pct=%.4f, exPct=%.4f, simplePct=%.4f, comboMax=%d, w1=%d, w2=%d, w3=%d, w4=%d, w5=%d, miss=%d },\n",
+        key, entry.rawBP, entry.bcPct, entry.bloomRating, entry.grade, entry.rateString,
+        entry.dpPct or 0, entry.wife3Pct or 0, entry.exPct or 0, entry.simplePct or 0, entry.comboMax or 0,
+        entry.w1 or 0, entry.w2 or 0, entry.w3 or 0, entry.w4 or 0, entry.w5 or 0, entry.miss or 0
       )
     end
     out = out .. "  }\n}\n"
@@ -142,17 +178,40 @@ function UpdateBCProfile()
   local rateStr    = string.format("%.2fx", getCurRateValue and getCurRateValue() or 1.0)
   local key        = BCScoreKey(song, steps, rateStr)
 
-  -- Get Bloom Rating from cache (already computed on song select)
-  local chartKey   = BCChartKey(song, steps)
-  local cache      = loadfile("Save/BCRatingCache.lua")
-  local ratings    = cache and cache() or {}
-  local bloomRating = (ratings[chartKey] and ratings[chartKey].Overall) or 0
+  -- Get Bloom Rating from BCGetRating (uses cache)
+  local bloomRating = steps:GetMeter()
+  if BCGetRating then
+    local ratingTable = BCGetRating(steps, song)
+    bloomRating = type(ratingTable) == "table" and ratingTable.Overall or ratingTable or bloomRating
+  end
 
   local bcPct      = BCState:GetPercent()
   local rawBP      = ComputeRawBP(bloomRating, bcPct)
   local grade      = BCGradeFromPercent(bcPct)
 
-  -- Only update if this is a new best for this chart-rate combo
+  -- Get percentages from all scoring systems
+  local dpPct      = 0
+  local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats(PLAYER_1)
+  if pss then
+    dpPct = pss:GetPercentDancePoints() * 100
+  end
+  local wife3Pct   = Wife3State:GetPercent()
+  local exPct      = EXState:GetPercent()
+  local simplePct  = SimpleState:GetPercent()
+  local comboMax   = ComboOnlyState:GetMaxCombo()
+
+  -- Get judgment tallies from stage stats
+  local w1, w2, w3, w4, w5, miss = 0, 0, 0, 0, 0, 0
+  if pss then
+    w1 = pss:GetTapNoteScores("TapNoteScore_W1") or 0
+    w2 = pss:GetTapNoteScores("TapNoteScore_W2") or 0
+    w3 = pss:GetTapNoteScores("TapNoteScore_W3") or 0
+    w4 = pss:GetTapNoteScores("TapNoteScore_W4") or 0
+    w5 = pss:GetTapNoteScores("TapNoteScore_W5") or 0
+    miss = pss:GetTapNoteScores("TapNoteScore_Miss") or 0
+  end
+
+  -- Only update if this is a new best for this chart-rate combo (based on rawBP)
   local existing   = profile.scores[key]
   if not existing or rawBP > existing.rawBP then
     profile.scores[key] = {
@@ -161,6 +220,19 @@ function UpdateBCProfile()
       bloomRating = bloomRating,
       grade       = grade,
       rateString  = rateStr,
+      -- Store scores from all systems
+      dpPct       = dpPct,
+      wife3Pct    = wife3Pct,
+      exPct       = exPct,
+      simplePct   = simplePct,
+      comboMax    = comboMax,
+      -- Store judgment tallies for PB display
+      w1          = w1,
+      w2          = w2,
+      w3          = w3,
+      w4          = w4,
+      w5          = w5,
+      miss        = miss,
     }
 
     -- Recompute total BP from all stored scores

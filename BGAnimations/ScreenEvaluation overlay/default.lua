@@ -212,10 +212,51 @@ t[#t+1] = Def.ActorFrame {
     }
   },
 
-  -- Judgment Breakdown
+  -- BC Rating section (Bloom Rating + Player Tier)
   Def.ActorFrame {
     InitCommand = function(self)
       self:y(110)
+    end,
+
+    -- Chart Bloom Rating label
+    LoadFont("hatsukoi 48px") .. {
+      InitCommand = function(self) self:xy(-150, 0):align(0, 0.5):zoom(0.298):settext("Bloom Rating"):diffuse(BCColors.textMuted) end
+    },
+    LoadFont("hatsukoi 24px") .. {
+      Name = "BloomRating",
+      InitCommand = function(self) self:xy(-30, 0):align(1, 0.5):settext("0.0★"):diffuse(BCColors.text):zoom(0.34) end,
+      OnCommand = function(self)
+        local steps = GAMESTATE:GetCurrentSteps(PLAYER_1)
+        local song = GAMESTATE:GetCurrentSong()
+        if steps and song and BCGetRating then
+          local ratingTable = BCGetRating(steps, song)
+          local bloomRating = ratingTable and ratingTable.Overall or steps:GetMeter()
+          self:settext(string.format("%.2f★", bloomRating))
+        end
+      end
+    },
+
+    -- Player BP Tier label
+    LoadFont("hatsukoi 48px") .. {
+      InitCommand = function(self) self:xy(-150, 22):align(0, 0.5):zoom(0.298):settext("Player Tier"):diffuse(BCColors.textMuted) end
+    },
+    LoadFont("hatsukoi 24px") .. {
+      Name = "PlayerTier",
+      InitCommand = function(self) self:xy(-30, 22):align(1, 0.5):settext("Seed"):diffuse(BCColors.text):zoom(0.34) end,
+      OnCommand = function(self)
+        if LoadBCProfile and BCTierFromTotal then
+          local profile = LoadBCProfile()
+          local tierName, tierColor = BCTierFromTotal(profile.totalBP)
+          self:settext(tierName):diffuse(tierColor or BCColors.text)
+        end
+      end
+    }
+  },
+
+  -- Judgment Breakdown
+  Def.ActorFrame {
+    InitCommand = function(self)
+      self:y(154)
     end,
 
     -- Label row 1: Marvelous
@@ -317,15 +358,97 @@ t[#t+1] = Def.ActorFrame {
         self:sleep(0.8):linear(1):settext(tostring(target))
       end
     }
-  },
+  }
+}
 
-  -- Footer buttons info
+  -- Offset Scatter Plot (right side)
+t[#t+1] = Def.ActorFrame {
+  InitCommand = function(self)
+    self:xy(SCREEN_CENTER_X + 320, SCREEN_CENTER_Y)
+        :diffusealpha(0)
+  end,
+  OnCommand = function(self)
+    self:decelerate(0.6)
+        :diffusealpha(1)
+  end,
+
+  -- Plot label
   LoadFont("hatsukoi 24px") .. {
     InitCommand = function(self)
-      self:y(180)
-          :settext("Enter: Retry  |  ←: Song Select  |  Esc: Quit")
+      self:y(-70)
+          :settext("Hit Timing")
           :diffuse(BCColors.textMuted)
           :zoom(0.298)
+    end
+  },
+
+  -- Plot background
+  Def.Quad {
+    InitCommand = function(self)
+      self:setsize(240, 120)
+          :align(0.5, 0.5)
+          :diffuse(0, 0, 0, 0.2)
+    end
+  },
+
+  -- Center line (perfect timing)
+  Def.Quad {
+    InitCommand = function(self)
+      self:setsize(240, 1)
+          :align(0.5, 0.5)
+          :diffuse(BCColors.textMuted)
+          :diffusealpha(0.3)
+    end
+  },
+
+  -- Offset points
+  Def.ActorMultiVertex {
+    Name = "OffsetPlot",
+    InitCommand = function(self)
+      self:SetDrawState({ Mode = "DrawMode_Quads" })
+    end,
+    OnCommand = function(self)
+      local song = GAMESTATE:GetCurrentSong()
+      if not song then return end
+
+      local songLen = song:GetLastSecond()
+      if songLen <= 0 then return end
+
+      -- Get judgment colors
+      local colors = {
+        TapNoteScore_W1 = BCColors.marvelous,
+        TapNoteScore_W2 = BCColors.perfect,
+        TapNoteScore_W3 = BCColors.great,
+        TapNoteScore_W4 = BCColors.good,
+        TapNoteScore_W5 = BCColors.bad
+      }
+
+      local verts = {}
+      local plotWidth = 220
+      local plotHeight = 100
+      local maxOffsetMs = 100  -- ±100ms range
+
+      -- Build vertices for each hit (small quads as dots)
+      if BCHitOffsets and #BCHitOffsets > 0 then
+        for _, hit in ipairs(BCHitOffsets) do
+          local x = (hit.time / songLen) * plotWidth - plotWidth / 2
+          local y = (hit.offset / maxOffsetMs) * (plotHeight / 2)
+          y = math.max(-plotHeight/2 + 2, math.min(plotHeight/2 - 2, y))  -- clamp to plot bounds
+
+          local color = colors[hit.judgment] or BCColors.text
+          local dotSize = 2
+
+          -- Create a small quad for each point
+          table.insert(verts, { { x - dotSize, y - dotSize, 0 }, color })
+          table.insert(verts, { { x + dotSize, y - dotSize, 0 }, color })
+          table.insert(verts, { { x + dotSize, y + dotSize, 0 }, color })
+          table.insert(verts, { { x - dotSize, y + dotSize, 0 }, color })
+        end
+      end
+
+      if #verts > 0 then
+        self:SetVertices(verts)
+      end
     end
   }
 }
@@ -396,79 +519,6 @@ if BCGetPref("showLifeGraph") then
 end
 
 -- ============================================================================
--- Footer buttons
--- ============================================================================
-t[#t+1] = Def.ActorFrame {
-  InitCommand = function(self)
-    self:xy(SCREEN_CENTER_X, SCREEN_HEIGHT - 50)
-  end,
-
-  -- Retry button
-  Def.ActorFrame {
-    InitCommand = function(self)
-      self:x(-120)
-    end,
-
-    Def.Quad {
-      InitCommand = function(self)
-        self:setsize(100, 36)
-            :diffuse(BCColors.accent)
-            :diffusealpha(0.3)
-      end
-    },
-
-    LoadFont("hatsukoi 48px") .. {
-      InitCommand = function(self)
-        self:settext("Retry")
-            :diffuse(BCColors.text)
-            :zoom(0.383)
-      end
-    }
-  },
-
-  -- Song Select button
-  Def.ActorFrame {
-    Def.Quad {
-      InitCommand = function(self)
-        self:setsize(120, 36)
-            :diffuse(BCColors.panel)
-      end
-    },
-
-    LoadFont("hatsukoi 48px") .. {
-      InitCommand = function(self)
-        self:settext("Song Select")
-            :diffuse(BCColors.text)
-            :zoom(0.383)
-      end
-    }
-  },
-
-  -- Quit button
-  Def.ActorFrame {
-    InitCommand = function(self)
-      self:x(140)
-    end,
-
-    Def.Quad {
-      InitCommand = function(self)
-        self:setsize(80, 36)
-            :diffuse(BCColors.panel)
-            :diffusealpha(0.5)
-      end
-    },
-
-    LoadFont("hatsukoi 48px") .. {
-      InitCommand = function(self)
-        self:settext("Quit")
-            :diffuse(BCColors.textMuted)
-            :zoom(0.383)
-      end
-    }
-  }
-}
-
--- ============================================================================
 -- Transition overlay
 -- ============================================================================
 t[#t+1] = Def.Quad {
@@ -478,6 +528,10 @@ t[#t+1] = Def.Quad {
         :diffusealpha(1)
   end,
   OnCommand = function(self)
+    -- Save BP to profile after song completion
+    if UpdateBCProfile then
+      UpdateBCProfile()
+    end
     self:decelerate(0.5)
         :diffusealpha(0)
   end,

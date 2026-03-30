@@ -93,13 +93,30 @@ function BCChartKey(song, steps)
 end
 
 -- ============================================================================
--- Rating Cache Persistence
+-- Rating Cache Persistence (Profile-Specific)
 -- ============================================================================
 
 local RatingCache = {}
 
+-- Get the profile-specific path for BCRatingCache.lua
+local function GetBCRatingCachePath()
+  if PROFILEMAN then
+    -- Try to get the profile directory from the current player
+    for _, pn in ipairs({PLAYER_1, PLAYER_2}) do
+      if PROFILEMAN:IsPersistentProfile(pn) then
+        -- Construct path using player number (API doesn't expose profile ID directly)
+        local playerStr = (pn == PLAYER_1) and "P1" or "P2"
+        return "Save/LocalProfiles/Player_" .. playerStr .. "/BCRatingCache.lua"
+      end
+    end
+  end
+  -- Fallback to global Save folder if no profile loaded
+  return "Save/BCRatingCache.lua"
+end
+
 function BCLoadRatingCache()
-  local chunk = loadfile("Save/BCRatingCache.lua")
+  local cachePath = GetBCRatingCachePath()
+  local chunk = loadfile(cachePath)
   if chunk then
     local loaded = chunk()
     if loaded and type(loaded) == "table" then
@@ -111,6 +128,8 @@ function BCLoadRatingCache()
 end
 
 function BCSaveRatingCache()
+  local cachePath = GetBCRatingCachePath()
+
   local out = "return {\n"
   for k, v in pairs(RatingCache) do
     local key = string.format("%q", k)
@@ -128,9 +147,9 @@ function BCSaveRatingCache()
     end
   end
   out = out .. "}\n"
-  
+
   local f = RageFileUtil.CreateRageFile()
-  if f:Open("Save/BCRatingCache.lua", 2) then -- 2 = WRITE
+  if f:Open(cachePath, 2) then -- 2 = WRITE
     f:Write(out)
     f:Close()
   end

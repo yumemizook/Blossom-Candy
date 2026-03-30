@@ -518,32 +518,32 @@ local songInfoPanel = Def.ActorFrame {
 
       if type(ratingTable) == "table" and ratingTable.Stream then
         local streamVal = self:GetChild("StreamVal")
-        streamVal:settext(string.format("%.1f", ratingTable.Stream))
-        streamVal:diffuse(GetSkillsetColor(ratingTable.Stream))
+        streamVal:settext(string.format("%.1f", ratingTable.Stream or 0))
+        streamVal:diffuse(GetSkillsetColor(ratingTable.Stream or 0))
 
         local jumpVal = self:GetChild("JumpstreamVal")
-        jumpVal:settext(string.format("%.1f", ratingTable.Jumpstream))
-        jumpVal:diffuse(GetSkillsetColor(ratingTable.Jumpstream))
+        jumpVal:settext(string.format("%.1f", ratingTable.Jumpstream or 0))
+        jumpVal:diffuse(GetSkillsetColor(ratingTable.Jumpstream or 0))
 
         local handVal = self:GetChild("HandstreamVal")
-        handVal:settext(string.format("%.1f", ratingTable.Handstream))
-        handVal:diffuse(GetSkillsetColor(ratingTable.Handstream))
+        handVal:settext(string.format("%.1f", ratingTable.Handstream or 0))
+        handVal:diffuse(GetSkillsetColor(ratingTable.Handstream or 0))
 
         local jackVal = self:GetChild("JackseedVal")
-        jackVal:settext(string.format("%.1f", ratingTable.Jackseed))
-        jackVal:diffuse(GetSkillsetColor(ratingTable.Jackseed))
+        jackVal:settext(string.format("%.1f", ratingTable.Jackseed or 0))
+        jackVal:diffuse(GetSkillsetColor(ratingTable.Jackseed or 0))
 
         local chordVal = self:GetChild("ChordjackVal")
-        chordVal:settext(string.format("%.1f", ratingTable.Chordjack))
-        chordVal:diffuse(GetSkillsetColor(ratingTable.Chordjack))
+        chordVal:settext(string.format("%.1f", ratingTable.Chordjack or 0))
+        chordVal:diffuse(GetSkillsetColor(ratingTable.Chordjack or 0))
 
         local techVal = self:GetChild("TechnicalVal")
-        techVal:settext(string.format("%.1f", ratingTable.Technical))
-        techVal:diffuse(GetSkillsetColor(ratingTable.Technical))
+        techVal:settext(string.format("%.1f", ratingTable.Technical or 0))
+        techVal:diffuse(GetSkillsetColor(ratingTable.Technical or 0))
 
         local stamVal = self:GetChild("StaminaVal")
-        stamVal:settext(string.format("%.1f", ratingTable.Stamina))
-        stamVal:diffuse(GetSkillsetColor(ratingTable.Stamina))
+        stamVal:settext(string.format("%.1f", ratingTable.Stamina or 0))
+        stamVal:diffuse(GetSkillsetColor(ratingTable.Stamina or 0))
       else
         self:GetChild("StreamVal"):settext("--"):diffuse(BCColors.textMuted)
         self:GetChild("JumpstreamVal"):settext("--"):diffuse(BCColors.textMuted)
@@ -750,9 +750,9 @@ local songInfoPanel = Def.ActorFrame {
     UpdatePBCommand = function(self)
       local song = GAMESTATE:GetCurrentSong()
       local steps = GAMESTATE:GetCurrentSteps(PLAYER_1)
-      local profile = PROFILEMAN:GetProfile(PLAYER_1)
+      local smProfile = PROFILEMAN:GetProfile(PLAYER_1)
 
-      if not song or not steps or not profile then
+      if not song or not steps then
         self:GetChild("PBScore"):settext("--")
         self:GetChild("PBJudgeInfo"):settext("")
         self:GetChild("PBBP"):settext("")
@@ -765,74 +765,117 @@ local songInfoPanel = Def.ActorFrame {
         return
       end
 
-      local highScore = profile:GetHighScoreList(song, steps):GetHighScores()[1]
-      if highScore then
-        local score = highScore:GetPercentDP()
-        local scoreText = string.format("%.2f%%", score * 100)
-        self:GetChild("PBScore"):settext(scoreText)
-
-        -- Calculate width for superscript positioning
-        local scoreWidth = self:GetChild("PBScore"):GetWidth() * 0.40
-
-        -- Get judge and scoring info
-        local judgeInfo = ""
-        local scoringMode = PREFSMAN:GetPreference("ScoringType")
-        if scoringMode then
-          local modeName = ToEnumShortString(scoringMode)
-          judgeInfo = modeName
+      -- Load saved data from BCProfile (profile-specific storage)
+      local bcProfile = nil
+      local savedEntry = nil
+      if LoadBCProfile and BCScoreKey and getCurRateValue then
+        bcProfile = LoadBCProfile()
+        local rateStr = string.format("%.2fx", getCurRateValue())
+        local key = BCScoreKey(song, steps, rateStr)
+        if bcProfile and bcProfile.scores then
+          savedEntry = bcProfile.scores[key]
         end
+      end
 
-        -- Get current judge window
-        local judge = 4
-        if tonumber(PREFSMAN:GetPreference("JudgeWindowAdd")) then
-          judge = 4 + tonumber(PREFSMAN:GetPreference("JudgeWindowAdd"))
-          if judge ~= 4 then
-            judgeInfo = (judgeInfo ~= "" and (judgeInfo .. " J" .. judge) or ("J" .. judge))
-          end
+      -- Get SM highscore for judgment tallies (fallback if no BC data)
+      local highScore = nil
+      if smProfile then
+        highScore = smProfile:GetHighScoreList(song, steps):GetHighScores()[1]
+      end
+
+      local scoringSystem = BCPrefs.scoringSystem or "BC"
+      local score = 0
+      local scoreText = "--"
+      local hasData = false
+
+      if savedEntry then
+        -- Use saved score from BCProfileData based on active scoring system
+        hasData = true
+        if scoringSystem == "Wife3" then
+          score = (savedEntry.wife3Pct or 0) / 100
+        elseif scoringSystem == "EX" then
+          score = (savedEntry.exPct or 0) / 100
+        elseif scoringSystem == "Simple" then
+          score = (savedEntry.simplePct or 0) / 100
+        elseif scoringSystem == "ComboOnly" then
+          scoreText = (savedEntry.comboMax or 0) .. "x"
+        else
+          -- BC or default: use BC%
+          score = (savedEntry.bcPct or 0) / 100
         end
-
-        local judgeActor = self:GetChild("PBJudgeInfo")
-        judgeActor:settext(judgeInfo)
-        judgeActor:x(scoreWidth + 6)
-
-        -- Calculate BP using ComputeRawBP formula from bc_pp.lua
-        local bpScale = 7.8
-        local bpBaseline = 0.94
-        local bpCurveK = 5.0
-
-        -- Get Bloom Rating (Overall)
-        local bloomRating = 0
-        if BCGetRating then
-          local ratingTable = BCGetRating(steps, song)
-          bloomRating = type(ratingTable) == "table" and ratingTable.Overall or ratingTable or 0
+        
+        if scoringSystem ~= "ComboOnly" then
+          scoreText = string.format("%.2f%%", score * 100)
         end
-
-        -- Accuracy Factor: e^(k × (score - baseline))
-        local function AccuracyFactor(bcPct)
-          return math.exp(bpCurveK * (bcPct / 100 - bpBaseline))
-        end
-
-        -- Minimum BC threshold
-        local function MinimumBC(rating)
-          return math.min(90.0, 60.0 + 2.5 * rating)
-        end
-
-        local bcPct = score * 100
-        local minBC = MinimumBC(bloomRating)
-        local bp = 0
-        if bcPct >= minBC then
-          bp = math.floor((bloomRating ^ 2) * AccuracyFactor(bcPct) * bpScale)
-        end
-        self:GetChild("PBBP"):settext(tostring(bp))
-
-        -- Get judgement tallies
+      elseif highScore then
+        -- Fallback: compute from SM highscore (DP-based approximation)
         local w1 = highScore:GetTapNoteScore("TapNoteScore_W1") or 0
         local w2 = highScore:GetTapNoteScore("TapNoteScore_W2") or 0
         local w3 = highScore:GetTapNoteScore("TapNoteScore_W3") or 0
         local w4 = highScore:GetTapNoteScore("TapNoteScore_W4") or 0
         local w5 = highScore:GetTapNoteScore("TapNoteScore_W5") or 0
         local miss = highScore:GetTapNoteScore("TapNoteScore_Miss") or 0
+        local totalNotes = w1 + w2 + w3 + w4 + w5 + miss
 
+        hasData = true
+        if scoringSystem == "Wife3" then
+          score = highScore:GetPercentDP()
+        elseif scoringSystem == "EX" then
+          if totalNotes > 0 then
+            local exScore = w1 * 3 + w2 * 2 + w3 * 1
+            score = (exScore / (totalNotes * 3))
+          end
+        elseif scoringSystem == "Simple" then
+          if totalNotes > 0 then
+            local hits = w1 + w2 + w3 + w4 + w5
+            score = hits / totalNotes
+          end
+        elseif scoringSystem == "ComboOnly" then
+          scoreText = highScore:GetMaxCombo() .. "x"
+        else
+          score = highScore:GetPercentDP()
+        end
+        
+        if scoringSystem ~= "ComboOnly" then
+          scoreText = string.format("%.2f%%", score * 100)
+        end
+      end
+
+      self:GetChild("PBScore"):settext(scoreText)
+
+      -- Calculate width for superscript positioning
+      local scoreWidth = self:GetChild("PBScore"):GetWidth() * 0.40
+
+      -- Get judge and scoring info from theme preferences
+      local judgeInfo = BCPrefs.scoringSystem or "BC"
+
+      local judgeActor = self:GetChild("PBJudgeInfo")
+      judgeActor:settext(judgeInfo)
+      judgeActor:x(scoreWidth + 6)
+
+      -- Load saved BP from BCProfileData (if available)
+      local bp = 0
+      if savedEntry then
+        bp = math.floor(savedEntry.rawBP or 0)
+      end
+      self:GetChild("PBBP"):settext(tostring(bp))
+
+      -- Display judgment tallies from saved data or highscore
+      if savedEntry then
+        -- Use saved values if available
+        self:GetChild("ValW1"):settext(tostring(savedEntry.w1 or ""))
+        self:GetChild("ValW2"):settext(tostring(savedEntry.w2 or ""))
+        self:GetChild("ValW3"):settext(tostring(savedEntry.w3 or ""))
+        self:GetChild("ValW4"):settext(tostring(savedEntry.w4 or ""))
+        self:GetChild("ValW5"):settext(tostring(savedEntry.w5 or ""))
+        self:GetChild("ValMiss"):settext(tostring(savedEntry.miss or ""))
+      elseif highScore then
+        local w1 = highScore:GetTapNoteScore("TapNoteScore_W1") or 0
+        local w2 = highScore:GetTapNoteScore("TapNoteScore_W2") or 0
+        local w3 = highScore:GetTapNoteScore("TapNoteScore_W3") or 0
+        local w4 = highScore:GetTapNoteScore("TapNoteScore_W4") or 0
+        local w5 = highScore:GetTapNoteScore("TapNoteScore_W5") or 0
+        local miss = highScore:GetTapNoteScore("TapNoteScore_Miss") or 0
         self:GetChild("ValW1"):settext(tostring(w1))
         self:GetChild("ValW2"):settext(tostring(w2))
         self:GetChild("ValW3"):settext(tostring(w3))
@@ -840,9 +883,6 @@ local songInfoPanel = Def.ActorFrame {
         self:GetChild("ValW5"):settext(tostring(w5))
         self:GetChild("ValMiss"):settext(tostring(miss))
       else
-        self:GetChild("PBScore"):settext("--")
-        self:GetChild("PBJudgeInfo"):settext("")
-        self:GetChild("PBBP"):settext("")
         self:GetChild("ValW1"):settext("")
         self:GetChild("ValW2"):settext("")
         self:GetChild("ValW3"):settext("")

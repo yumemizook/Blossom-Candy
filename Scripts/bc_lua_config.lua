@@ -64,11 +64,10 @@ function create_lua_config(cfg)
       if PROFILEMAN and GAMESTATE then
         for _, pn in ipairs({PLAYER_1, PLAYER_2}) do
           if PROFILEMAN:IsPersistentProfile(pn) then
-            local profile = PROFILEMAN:GetProfile(pn)
-            if profile then
-              profileDir = profile:GetProfileDir()
-              break
-            end
+            -- Construct path using player number (API doesn't expose profile ID directly)
+            local playerStr = (pn == PLAYER_1) and "P1" or "P2"
+            profileDir = "Save/LocalProfiles/Player_" .. playerStr
+            break
           end
         end
       end
@@ -96,12 +95,11 @@ function create_lua_config(cfg)
       if PROFILEMAN and GAMESTATE then
         for _, pn in ipairs({PLAYER_1, PLAYER_2}) do
           if PROFILEMAN:IsPersistentProfile(pn) then
-            local profile = PROFILEMAN:GetProfile(pn)
-            if profile then
-              profileDir = profile:GetProfileDir()
-              pn_save = pn
-              break
-            end
+            -- Construct path using player number (API doesn't expose profile ID directly)
+            local playerStr = (pn == PLAYER_1) and "P1" or "P2"
+            profileDir = "Save/LocalProfiles/Player_" .. playerStr
+            pn_save = pn
+            break
           end
         end
       end

@@ -105,4 +105,5 @@ function BCResetAllAccumulators()
   EXState:Reset()
   SimpleState:Reset()
   ComboOnlyState:Reset()
+  BCHitOffsets = {}  -- Reset hit offset data for evaluation screen
 end

@@ -190,6 +190,16 @@ t[#t+1] = Def.Sprite {
     Wife3State:AddJudgment(param.TapNoteOffset, isMiss)
     EXState:AddJudgment(param.TapNoteScore)
     SimpleState:AddJudgment(param.TapNoteScore)
+
+    -- Collect offset data for evaluation screen scatter plot
+    if not isMiss and param.TapNoteOffset ~= nil then
+      local noteTime = param.NoteStartTime or GAMESTATE:GetCurMusicSeconds()
+      table.insert(BCHitOffsets, {
+        time = noteTime,
+        offset = param.TapNoteOffset * 1000,  -- convert to ms
+        judgment = param.TapNoteScore
+      })
+    end
   end
 }
 

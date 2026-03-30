@@ -17,14 +17,33 @@ end
 
 local W = GetBCWindows()  -- computed once at load; values are in ms
 
--- Marvelous "perfect" zone: 0-4.5ms fixed at 1.00
-local MARVELOUS_MAX_MS = 4.5
+-- Error function approximation (A&S formula 7.1.26)
+local function erf(x)
+  local sign = x < 0 and -1 or 1
+  x = math.abs(x)
+  local p  =  0.3275911
+  local a1 =  0.254829592
+  local a2 = -0.284496736
+  local a3 =  1.421413741
+  local a4 = -1.453152027
+  local a5 =  1.061405429
+  local t = 1.0 / (1.0 + p * x)
+  local y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t * math.exp(-x*x)
+  return sign * y
+end
 
--- Smoothstep cubic ease: t in [t_min, t_max] → [s_max, s_min]
-local function cubicEase(t, t_min, t_max, s_max, s_min)
-  local x = (t - t_min) / (t_max - t_min)
-  local curved = x * x * (3 - 2 * x)  -- smoothstep cubic
-  return s_max + (s_min - s_max) * curved
+-- Erf-based scoring curve: 0-67.5ms continuous
+-- Parameters tuned so: t=0 → ~1.0, t=4.5 → ~0.998, t=22.5 → ~0.909, t=45 → ~0.80, t=67.5 → 0.0
+local ERF_OFFSET = 36.0    -- center point (ms)
+local ERF_SPREAD = 10.5    -- spread factor (ms) - tuned for 0.80 at 45ms
+
+local function erfScore(t)
+  -- Linear mapping: output goes from 1.0 at t=4.5 to 0.0 at t=67.5
+  -- At t=4.5: (4.5-36)/10.5 = -3.0, erf(-3) ≈ -0.998, output ≈ 0.999
+  -- At t=22.5: (22.5-36)/10.5 = -1.286, erf(-1.286) ≈ -0.818, output ≈ 0.909
+  -- At t=45: (45-36)/10.5 = 0.857, erf(0.857) ≈ 0.600, output ≈ 0.80
+  -- At t=67.5: (67.5-36)/10.5 = 3.0, erf(3) ≈ 0.998, output ≈ 0.001
+  return 0.5 * (1.0 - erf((t - ERF_OFFSET) / ERF_SPREAD))
 end
 
 -- Linear interpolation: t in [t_min, t_max] → [s_start, s_end]
@@ -45,21 +64,10 @@ function BCNoteScore(offsetSeconds)
   end
   local t = math.abs(offsetSeconds) * 1000  -- convert to ms for comparison with W.*
 
-  if t <= MARVELOUS_MAX_MS then
-    -- Marvelous (max): fixed 1.00 for 0-4.5ms
-    return 1.00
-
-  elseif t <= W.W1 then
-    -- Marvelous (decay): cubic 1.00 → 0.97 for 4.5-22.5ms
-    return cubicEase(t, MARVELOUS_MAX_MS, W.W1, 1.00, 0.97)
-
-  elseif t <= W.W2 then
-    -- Perfect: cubic 0.97 → 0.80 for 22.5-45ms
-    return cubicEase(t, W.W1, W.W2, 0.97, 0.80)
-
-  elseif t <= greatZero then
-    -- Great (positive half): cubic 0.80 → 0.00
-    return cubicEase(t, W.W2, greatZero, 0.80, 0.00)
+  if t <= greatZero then
+    -- Continuous erf curve: 0-67.5ms (Marvelous, Perfect, Great+)
+    -- Goes from 1.00 at 0ms → 0.983 at 4.5ms → 0.00 at 67.5ms
+    return erfScore(t)
 
   elseif t <= W.W3 then
     -- Great (negative half): linear 0.00 → −0.75
@@ -123,10 +131,7 @@ end
 
 -- Curve Summary (at J4 defaults):
 -- | Offset (abs) | Judgment | Score | Shape |
--- | 0 – 4.5ms | Marvelous (max) | 1.00 | Fixed |
--- | 4.5 – 22.5ms | Marvelous (decay) | 1.00 → 0.97 | Cubic |
--- | 22.5 – 45ms | Perfect | 0.97 → 0.80 | Cubic |
--- | 45 – 67.5ms | Great (pos.) | 0.80 → 0.00 | Cubic |
+-- | 0 – 67.5ms | Marvelous/Perfect/Great+ | 1.00 → 0.00 | Erf (0.983 at 4.5ms) |
 -- | 67.5 – 90ms | Great (neg.) | 0.00 → −0.75 | Linear |
 -- | 90 – 135ms | Good | −0.75 → −1.50 | Linear |
 -- | 135 – 180ms | Bad | −1.50 → −2.50 | Linear |
