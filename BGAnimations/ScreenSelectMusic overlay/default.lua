@@ -291,38 +291,91 @@ local songInfoPanel = Def.ActorFrame {
     UpdateCommand = function(self)
       local steps = GAMESTATE:GetCurrentSteps(PLAYER_1)
       local song = GAMESTATE:GetCurrentSong()
-      if steps and song then
-        local stars = steps:GetMeter()
-        if BCGetRating then
-          local ratingTable = BCGetRating(steps, song)
-          stars = type(ratingTable) == "table" and ratingTable.Overall or ratingTable or stars
-        end
-        local isBlossom = stars >= 10.0
-        local prefix = isBlossom and "✦ " or ""
-        self:settext(string.format("%s%.2f ★", prefix, stars))
-        if isBlossom then
-          self:stopeffect()
-                  :diffuse(BCColors.gradeBlossom)
-                  :diffuseshift()
-                  :effectcolor1(BCColors.gradeBlossom)
-                  :effectcolor2(BCColors.marvelous)
-                  :effectperiod(1.5)
-        else
-          self:stopeffect():diffuse(BCColors.text)
-        end
-      else
+
+      -- Verify we have valid song and steps before displaying rating
+      if not steps or not song then
         self:settext("")
+        return
+      end
+
+      -- Validate that steps belongs to the current song (prevent race condition)
+      local stepsBelongsToSong = false
+      local songSteps = song:GetAllSteps()
+      for _, s in ipairs(songSteps) do
+        if s == steps then
+          stepsBelongsToSong = true
+          break
+        end
+      end
+
+      if not stepsBelongsToSong then
+        self:settext("")
+        -- Retry after a short delay when wheel settles
+        self:sleep(0.1):queuecommand("Update")
+        return
+      end
+
+      local stars = steps:GetMeter()
+      if BCGetRating then
+        local ratingTable = BCGetRating(steps, song)
+        stars = type(ratingTable) == "table" and ratingTable.Overall or ratingTable or stars
+      end
+
+      -- Blue -> Green -> Yellow -> Red -> Purple color scale function for overall rating
+      local function GetRatingColor(value)
+        local t = math.max(0, math.min(1, value / 10))
+        local r, g, b
+        if t < 0.25 then
+          -- Blue to Green
+          local p = t / 0.25
+          r = 0.25 + (0.20 - 0.25) * p
+          g = 0.45 + (0.80 - 0.45) * p
+          b = 0.90 + (0.25 - 0.90) * p
+        elseif t < 0.50 then
+          -- Green to Yellow
+          local p = (t - 0.25) / 0.25
+          r = 0.20 + (0.95 - 0.20) * p
+          g = 0.80 + (0.85 - 0.80) * p
+          b = 0.25 + (0.20 - 0.25) * p
+        elseif t < 0.75 then
+          -- Yellow to Red
+          local p = (t - 0.50) / 0.25
+          r = 0.95 + (0.90 - 0.95) * p
+          g = 0.85 + (0.20 - 0.85) * p
+          b = 0.20 + (0.25 - 0.20) * p
+        else
+          -- Red to Purple
+          local p = (t - 0.75) / 0.25
+          r = 0.90 + (0.50 - 0.90) * p
+          g = 0.20 + (0.10 - 0.20) * p
+          b = 0.25 + (0.90 - 0.25) * p
+        end
+        return color(string.format("%.3f,%.3f,%.3f,1", r, g, b))
+      end
+
+      local isBlossom = stars >= 10.0
+      local prefix = isBlossom and "✦ " or ""
+      self:settext(string.format("%s%.2f ★", prefix, stars))
+      if isBlossom then
+        self:stopeffect()
+            :diffuse(GetRatingColor(stars))
+            :diffuseshift()
+            :effectcolor1(GetRatingColor(stars))
+            :effectcolor2(color("0.55,0.15,0.95,1"))
+            :effectperiod(1.5)
+      else
+        self:stopeffect():diffuse(GetRatingColor(stars))
       end
     end
   },
 
   -- ============================================================================
-  -- SKILLSET RADAR (Stream, Tech, Jack, Stamina)
+  -- SKILLSET RADAR (7 Skillsets: Stream, Jumpstream, Handstream, Jackseed, Chordjack, Technical, Stamina)
   -- ============================================================================
   Def.ActorFrame {
     Name = "SkillsetRadar",
     InitCommand = function(self)
-      self:xy(20, 55)
+      self:xy(20, 75)
     end,
     OnCommand = function(self)
       -- Force initial update with delay to catch initial song/steps
@@ -332,59 +385,131 @@ local songInfoPanel = Def.ActorFrame {
     CurrentSongChangedMessageCommand = function(self) self:playcommand("UpdateSkills") end,
     CurrentStepsChangedMessageCommand = function(self) self:playcommand("UpdateSkills") end,
 
-    -- Dark backing
-    Def.Quad {
-      InitCommand = function(self)
-        self:setsize(300, 42):align(0, 0.5):diffuse(Color.Black):diffusealpha(0.65)
-      end
-    },
-
-    -- STREAM COLUMN
+    -- ROW 1: Stream | Jumpstream | Handstream | Jackseed
+    -- STREAM
     LoadFont("hatsukoi 48px") .. {
-      InitCommand = function(self) self:xy(15, -10):align(0, 0.5):zoom(0.25):settext("Stream"):diffuse(BCColors.textMuted) end
+      InitCommand = function(self) self:xy(12, -22):align(0, 0.5):zoom(0.22):settext("Stream"):diffuse(BCColors.textMuted) end
     },
     LoadFont("hatsukoi 48px") .. {
       Name = "StreamVal",
-      InitCommand = function(self) self:xy(15, 8):align(0, 0.5):zoom(0.35):diffuse(BCColors.text) end
+      InitCommand = function(self) self:xy(12, -8):align(0, 0.5):zoom(0.30):diffuse(BCColors.text) end
     },
 
-    -- TECH COLUMN
+    -- JUMPSTREAM
     LoadFont("hatsukoi 48px") .. {
-      InitCommand = function(self) self:xy(90, -10):align(0, 0.5):zoom(0.25):settext("Tech"):diffuse(BCColors.textMuted) end
+      InitCommand = function(self) self:xy(88, -22):align(0, 0.5):zoom(0.22):settext("Jump"):diffuse(BCColors.textMuted) end
     },
     LoadFont("hatsukoi 48px") .. {
-      Name = "TechVal",
-      InitCommand = function(self) self:xy(90, 8):align(0, 0.5):zoom(0.35):diffuse(BCColors.text) end
-    },
-
-    -- JACK COLUMN
-    LoadFont("hatsukoi 48px") .. {
-      InitCommand = function(self) self:xy(165, -10):align(0, 0.5):zoom(0.25):settext("Jack"):diffuse(BCColors.textMuted) end
-    },
-    LoadFont("hatsukoi 48px") .. {
-      Name = "JackVal",
-      InitCommand = function(self) self:xy(165, 8):align(0, 0.5):zoom(0.35):diffuse(BCColors.text) end
+      Name = "JumpstreamVal",
+      InitCommand = function(self) self:xy(88, -8):align(0, 0.5):zoom(0.30):diffuse(BCColors.text) end
     },
 
-    -- STAMINA COLUMN
+    -- HANDSTREAM
     LoadFont("hatsukoi 48px") .. {
-      InitCommand = function(self) self:xy(240, -10):align(0, 0.5):zoom(0.25):settext("Stam"):diffuse(BCColors.textMuted) end
+      InitCommand = function(self) self:xy(162, -22):align(0, 0.5):zoom(0.22):settext("Hand"):diffuse(BCColors.textMuted) end
+    },
+    LoadFont("hatsukoi 48px") .. {
+      Name = "HandstreamVal",
+      InitCommand = function(self) self:xy(162, -8):align(0, 0.5):zoom(0.30):diffuse(BCColors.text) end
+    },
+
+    -- JACKSEED
+    LoadFont("hatsukoi 48px") .. {
+      InitCommand = function(self) self:xy(236, -22):align(0, 0.5):zoom(0.22):settext("Jack"):diffuse(BCColors.textMuted) end
+    },
+    LoadFont("hatsukoi 48px") .. {
+      Name = "JackseedVal",
+      InitCommand = function(self) self:xy(236, -8):align(0, 0.5):zoom(0.30):diffuse(BCColors.text) end
+    },
+
+    -- ROW 2: Chordjack | Technical | Stamina
+    -- CHORDJACK
+    LoadFont("hatsukoi 48px") .. {
+      InitCommand = function(self) self:xy(12, 10):align(0, 0.5):zoom(0.22):settext("ChordJ"):diffuse(BCColors.textMuted) end
+    },
+    LoadFont("hatsukoi 48px") .. {
+      Name = "ChordjackVal",
+      InitCommand = function(self) self:xy(12, 24):align(0, 0.5):zoom(0.30):diffuse(BCColors.text) end
+    },
+
+    -- TECHNICAL
+    LoadFont("hatsukoi 48px") .. {
+      InitCommand = function(self) self:xy(88, 10):align(0, 0.5):zoom(0.22):settext("Tech"):diffuse(BCColors.textMuted) end
+    },
+    LoadFont("hatsukoi 48px") .. {
+      Name = "TechnicalVal",
+      InitCommand = function(self) self:xy(88, 24):align(0, 0.5):zoom(0.30):diffuse(BCColors.text) end
+    },
+
+    -- STAMINA
+    LoadFont("hatsukoi 48px") .. {
+      InitCommand = function(self) self:xy(162, 10):align(0, 0.5):zoom(0.22):settext("Stam"):diffuse(BCColors.textMuted) end
     },
     LoadFont("hatsukoi 48px") .. {
       Name = "StaminaVal",
-      InitCommand = function(self) self:xy(240, 8):align(0, 0.5):zoom(0.35):diffuse(BCColors.text) end
+      InitCommand = function(self) self:xy(162, 24):align(0, 0.5):zoom(0.30):diffuse(BCColors.text) end
     },
 
     UpdateSkillsCommand = function(self)
       local song = GAMESTATE:GetCurrentSong()
       local steps = GAMESTATE:GetCurrentSteps(PLAYER_1)
 
-      if not song or not steps then
+      -- Verify we have valid song and steps, and steps belongs to song
+      if not steps or not song then
         self:visible(false)
         return
       end
 
+      -- Validate that steps belongs to the current song (prevent race condition)
+      local stepsBelongsToSong = false
+      local songSteps = song:GetAllSteps()
+      for _, s in ipairs(songSteps) do
+        if s == steps then
+          stepsBelongsToSong = true
+          break
+        end
+      end
+
+      if not stepsBelongsToSong then
+        self:visible(false)
+        -- Retry after a short delay when wheel settles
+        self:sleep(0.1):queuecommand("UpdateSkills")
+        return
+      end
+
       self:visible(true)
+
+      -- Blue -> Green -> Yellow -> Red -> Purple color scale function
+      local function GetSkillsetColor(value)
+        local t = math.max(0, math.min(1, value / 10))
+        local r, g, b
+        if t < 0.25 then
+          -- Blue to Green
+          local p = t / 0.25
+          r = 0.25 + (0.20 - 0.25) * p
+          g = 0.45 + (0.80 - 0.45) * p
+          b = 0.90 + (0.25 - 0.90) * p
+        elseif t < 0.50 then
+          -- Green to Yellow
+          local p = (t - 0.25) / 0.25
+          r = 0.20 + (0.95 - 0.20) * p
+          g = 0.80 + (0.85 - 0.80) * p
+          b = 0.25 + (0.20 - 0.25) * p
+        elseif t < 0.75 then
+          -- Yellow to Red
+          local p = (t - 0.50) / 0.25
+          r = 0.95 + (0.90 - 0.95) * p
+          g = 0.85 + (0.20 - 0.85) * p
+          b = 0.20 + (0.25 - 0.20) * p
+        else
+          -- Red to Purple
+          local p = (t - 0.75) / 0.25
+          r = 0.90 + (0.50 - 0.90) * p
+          g = 0.20 + (0.10 - 0.20) * p
+          b = 0.25 + (0.90 - 0.25) * p
+        end
+        return color(string.format("%.3f,%.3f,%.3f,1", r, g, b))
+      end
 
       local ratingTable = nil
       if BCGetRating then
@@ -392,29 +517,54 @@ local songInfoPanel = Def.ActorFrame {
       end
 
       if type(ratingTable) == "table" and ratingTable.Stream then
-        self:GetChild("StreamVal"):settext(string.format("%.1f", ratingTable.Stream))
-        self:GetChild("TechVal"):settext(string.format("%.1f", ratingTable.Tech))
-        self:GetChild("JackVal"):settext(string.format("%.1f", ratingTable.Jack))
-        self:GetChild("StaminaVal"):settext(string.format("%.1f", ratingTable.Stamina))
+        local streamVal = self:GetChild("StreamVal")
+        streamVal:settext(string.format("%.1f", ratingTable.Stream))
+        streamVal:diffuse(GetSkillsetColor(ratingTable.Stream))
+
+        local jumpVal = self:GetChild("JumpstreamVal")
+        jumpVal:settext(string.format("%.1f", ratingTable.Jumpstream))
+        jumpVal:diffuse(GetSkillsetColor(ratingTable.Jumpstream))
+
+        local handVal = self:GetChild("HandstreamVal")
+        handVal:settext(string.format("%.1f", ratingTable.Handstream))
+        handVal:diffuse(GetSkillsetColor(ratingTable.Handstream))
+
+        local jackVal = self:GetChild("JackseedVal")
+        jackVal:settext(string.format("%.1f", ratingTable.Jackseed))
+        jackVal:diffuse(GetSkillsetColor(ratingTable.Jackseed))
+
+        local chordVal = self:GetChild("ChordjackVal")
+        chordVal:settext(string.format("%.1f", ratingTable.Chordjack))
+        chordVal:diffuse(GetSkillsetColor(ratingTable.Chordjack))
+
+        local techVal = self:GetChild("TechnicalVal")
+        techVal:settext(string.format("%.1f", ratingTable.Technical))
+        techVal:diffuse(GetSkillsetColor(ratingTable.Technical))
+
+        local stamVal = self:GetChild("StaminaVal")
+        stamVal:settext(string.format("%.1f", ratingTable.Stamina))
+        stamVal:diffuse(GetSkillsetColor(ratingTable.Stamina))
       else
-        self:GetChild("StreamVal"):settext("--")
-        self:GetChild("TechVal"):settext("--")
-        self:GetChild("JackVal"):settext("--")
-        self:GetChild("StaminaVal"):settext("--")
+        self:GetChild("StreamVal"):settext("--"):diffuse(BCColors.textMuted)
+        self:GetChild("JumpstreamVal"):settext("--"):diffuse(BCColors.textMuted)
+        self:GetChild("HandstreamVal"):settext("--"):diffuse(BCColors.textMuted)
+        self:GetChild("JackseedVal"):settext("--"):diffuse(BCColors.textMuted)
+        self:GetChild("ChordjackVal"):settext("--"):diffuse(BCColors.textMuted)
+        self:GetChild("TechnicalVal"):settext("--"):diffuse(BCColors.textMuted)
+        self:GetChild("StaminaVal"):settext("--"):diffuse(BCColors.textMuted)
       end
     end
   },
 
   -- ============================================================================
-  -- PERSONAL BEST DISPLAY
+  -- PERSONAL BEST DISPLAY (Compact Layout)
   -- ============================================================================
   Def.ActorFrame {
     Name = "PersonalBest",
     InitCommand = function(self)
-      self:xy(20, 115)
+      self:xy(20, 140)
     end,
     OnCommand = function(self)
-      -- Force initial update with delay
       self:playcommand("UpdatePB")
       self:sleep(0.2):queuecommand("UpdatePB")
     end,
@@ -423,23 +573,177 @@ local songInfoPanel = Def.ActorFrame {
 
     -- PB Label
     LoadFont("hatsukoi 48px") .. {
+      Name = "PBLabel",
       InitCommand = function(self)
         self:align(0, 0.5)
             :settext("Personal Best")
             :diffuse(BCColors.textMuted)
-            :zoom(0.28)
+            :zoom(0.26)
       end
     },
 
-    -- PB Score
+    -- Main Score
     LoadFont("hatsukoi Bold 48px") .. {
       Name = "PBScore",
       InitCommand = function(self)
-        self:xy(0, 22)
+        self:xy(0, 20)
             :align(0, 0.5)
             :settext("--")
             :diffuse(BCColors.text)
-            :zoom(0.42)
+            :zoom(0.40)
+      end
+    },
+
+    -- Judge/Scoring superscript
+    LoadFont("hatsukoi 48px") .. {
+      Name = "PBJudgeInfo",
+      InitCommand = function(self)
+        self:xy(0, 20)
+            :align(0, 0.5)
+            :settext("")
+            :diffuse(BCColors.textMuted)
+            :zoom(0.18)
+      end
+    },
+
+    -- BP Display (inline with score area)
+    LoadFont("hatsukoi Bold 48px") .. {
+      Name = "PBBP",
+      InitCommand = function(self)
+        self:xy(140, 20)
+            :align(0, 0.5)
+            :settext("")
+            :diffuse(BCColors.accent)
+            :zoom(0.30)
+      end
+    },
+
+    -- Judgement Tally - Compact 2x3 Grid Layout
+    -- Row 1: MA | PR | GR
+    LoadFont("hatsukoi 48px") .. {
+      Name = "LabelW1",
+      InitCommand = function(self)
+        self:xy(0, 42)
+            :align(0, 0.5)
+            :settext("MA")
+            :diffuse(color("1,0.85,0.4,1"))
+            :zoom(0.20)
+      end
+    },
+    LoadFont("hatsukoi Bold 48px") .. {
+      Name = "ValW1",
+      InitCommand = function(self)
+        self:xy(22, 42)
+            :align(0, 0.5)
+            :settext("")
+            :diffuse(BCColors.text)
+            :zoom(0.24)
+      end
+    },
+
+    LoadFont("hatsukoi 48px") .. {
+      Name = "LabelW2",
+      InitCommand = function(self)
+        self:xy(70, 42)
+            :align(0, 0.5)
+            :settext("PR")
+            :diffuse(color("0.9,0.5,0.9,1"))
+            :zoom(0.20)
+      end
+    },
+    LoadFont("hatsukoi Bold 48px") .. {
+      Name = "ValW2",
+      InitCommand = function(self)
+        self:xy(92, 42)
+            :align(0, 0.5)
+            :settext("")
+            :diffuse(BCColors.text)
+            :zoom(0.24)
+      end
+    },
+
+    LoadFont("hatsukoi 48px") .. {
+      Name = "LabelW3",
+      InitCommand = function(self)
+        self:xy(140, 42)
+            :align(0, 0.5)
+            :settext("GR")
+            :diffuse(color("0.2,0.8,0.4,1"))
+            :zoom(0.20)
+      end
+    },
+    LoadFont("hatsukoi Bold 48px") .. {
+      Name = "ValW3",
+      InitCommand = function(self)
+        self:xy(162, 42)
+            :align(0, 0.5)
+            :settext("")
+            :diffuse(BCColors.text)
+            :zoom(0.24)
+      end
+    },
+
+    -- Row 2: GD | BD | MS
+    LoadFont("hatsukoi 48px") .. {
+      Name = "LabelW4",
+      InitCommand = function(self)
+        self:xy(0, 58)
+            :align(0, 0.5)
+            :settext("GD")
+            :diffuse(color("0.3,0.6,0.9,1"))
+            :zoom(0.20)
+      end
+    },
+    LoadFont("hatsukoi Bold 48px") .. {
+      Name = "ValW4",
+      InitCommand = function(self)
+        self:xy(22, 58)
+            :align(0, 0.5)
+            :settext("")
+            :diffuse(BCColors.text)
+            :zoom(0.24)
+      end
+    },
+
+    LoadFont("hatsukoi 48px") .. {
+      Name = "LabelW5",
+      InitCommand = function(self)
+        self:xy(70, 58)
+            :align(0, 0.5)
+            :settext("BD")
+            :diffuse(color("0.9,0.4,0.2,1"))
+            :zoom(0.20)
+      end
+    },
+    LoadFont("hatsukoi Bold 48px") .. {
+      Name = "ValW5",
+      InitCommand = function(self)
+        self:xy(92, 58)
+            :align(0, 0.5)
+            :settext("")
+            :diffuse(BCColors.text)
+            :zoom(0.24)
+      end
+    },
+
+    LoadFont("hatsukoi 48px") .. {
+      Name = "LabelMiss",
+      InitCommand = function(self)
+        self:xy(140, 58)
+            :align(0, 0.5)
+            :settext("MS")
+            :diffuse(color("0.7,0.2,0.2,1"))
+            :zoom(0.20)
+      end
+    },
+    LoadFont("hatsukoi Bold 48px") .. {
+      Name = "ValMiss",
+      InitCommand = function(self)
+        self:xy(162, 58)
+            :align(0, 0.5)
+            :settext("")
+            :diffuse(BCColors.text)
+            :zoom(0.24)
       end
     },
 
@@ -450,15 +754,101 @@ local songInfoPanel = Def.ActorFrame {
 
       if not song or not steps or not profile then
         self:GetChild("PBScore"):settext("--")
+        self:GetChild("PBJudgeInfo"):settext("")
+        self:GetChild("PBBP"):settext("")
+        self:GetChild("ValW1"):settext("")
+        self:GetChild("ValW2"):settext("")
+        self:GetChild("ValW3"):settext("")
+        self:GetChild("ValW4"):settext("")
+        self:GetChild("ValW5"):settext("")
+        self:GetChild("ValMiss"):settext("")
         return
       end
 
       local highScore = profile:GetHighScoreList(song, steps):GetHighScores()[1]
       if highScore then
         local score = highScore:GetPercentDP()
-        self:GetChild("PBScore"):settext(string.format("%.2f%%", score * 100))
+        local scoreText = string.format("%.2f%%", score * 100)
+        self:GetChild("PBScore"):settext(scoreText)
+
+        -- Calculate width for superscript positioning
+        local scoreWidth = self:GetChild("PBScore"):GetWidth() * 0.40
+
+        -- Get judge and scoring info
+        local judgeInfo = ""
+        local scoringMode = PREFSMAN:GetPreference("ScoringType")
+        if scoringMode then
+          local modeName = ToEnumShortString(scoringMode)
+          judgeInfo = modeName
+        end
+
+        -- Get current judge window
+        local judge = 4
+        if tonumber(PREFSMAN:GetPreference("JudgeWindowAdd")) then
+          judge = 4 + tonumber(PREFSMAN:GetPreference("JudgeWindowAdd"))
+          if judge ~= 4 then
+            judgeInfo = (judgeInfo ~= "" and (judgeInfo .. " J" .. judge) or ("J" .. judge))
+          end
+        end
+
+        local judgeActor = self:GetChild("PBJudgeInfo")
+        judgeActor:settext(judgeInfo)
+        judgeActor:x(scoreWidth + 6)
+
+        -- Calculate BP using ComputeRawBP formula from bc_pp.lua
+        local bpScale = 7.8
+        local bpBaseline = 0.94
+        local bpCurveK = 5.0
+
+        -- Get Bloom Rating (Overall)
+        local bloomRating = 0
+        if BCGetRating then
+          local ratingTable = BCGetRating(steps, song)
+          bloomRating = type(ratingTable) == "table" and ratingTable.Overall or ratingTable or 0
+        end
+
+        -- Accuracy Factor: e^(k × (score - baseline))
+        local function AccuracyFactor(bcPct)
+          return math.exp(bpCurveK * (bcPct / 100 - bpBaseline))
+        end
+
+        -- Minimum BC threshold
+        local function MinimumBC(rating)
+          return math.min(90.0, 60.0 + 2.5 * rating)
+        end
+
+        local bcPct = score * 100
+        local minBC = MinimumBC(bloomRating)
+        local bp = 0
+        if bcPct >= minBC then
+          bp = math.floor((bloomRating ^ 2) * AccuracyFactor(bcPct) * bpScale)
+        end
+        self:GetChild("PBBP"):settext(tostring(bp))
+
+        -- Get judgement tallies
+        local w1 = highScore:GetTapNoteScore("TapNoteScore_W1") or 0
+        local w2 = highScore:GetTapNoteScore("TapNoteScore_W2") or 0
+        local w3 = highScore:GetTapNoteScore("TapNoteScore_W3") or 0
+        local w4 = highScore:GetTapNoteScore("TapNoteScore_W4") or 0
+        local w5 = highScore:GetTapNoteScore("TapNoteScore_W5") or 0
+        local miss = highScore:GetTapNoteScore("TapNoteScore_Miss") or 0
+
+        self:GetChild("ValW1"):settext(tostring(w1))
+        self:GetChild("ValW2"):settext(tostring(w2))
+        self:GetChild("ValW3"):settext(tostring(w3))
+        self:GetChild("ValW4"):settext(tostring(w4))
+        self:GetChild("ValW5"):settext(tostring(w5))
+        self:GetChild("ValMiss"):settext(tostring(miss))
       else
         self:GetChild("PBScore"):settext("--")
+        self:GetChild("PBJudgeInfo"):settext("")
+        self:GetChild("PBBP"):settext("")
+        self:GetChild("ValW1"):settext("")
+        self:GetChild("ValW2"):settext("")
+        self:GetChild("ValW3"):settext("")
+        self:GetChild("ValW4"):settext("")
+        self:GetChild("ValW5"):settext("")
+        self:GetChild("ValMiss"):settext("")
       end
     end
   }

@@ -143,10 +143,10 @@ function UpdateBCProfile()
   local key        = BCScoreKey(song, steps, rateStr)
 
   -- Get Bloom Rating from cache (already computed on song select)
-  local chartKey   = ChartKey(song, steps)
+  local chartKey   = BCChartKey(song, steps)
   local cache      = loadfile("Save/BCRatingCache.lua")
   local ratings    = cache and cache() or {}
-  local bloomRating = (ratings[chartKey] and ratings[chartKey].stars) or 0
+  local bloomRating = (ratings[chartKey] and ratings[chartKey].Overall) or 0
 
   local bcPct      = BCState:GetPercent()
   local rawBP      = ComputeRawBP(bloomRating, bcPct)

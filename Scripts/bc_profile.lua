@@ -18,11 +18,14 @@ function BCProfile:GetProfileInfo(index)
   local profile = PROFILEMAN:GetLocalProfile(id)
   if not profile then return nil end
   
+  -- Build profile directory from ID (local profiles don't have GetProfileDir method)
+  local profileDir = "Save/LocalProfiles/" .. id
+  
   return {
     index = index,
     id = id,
     name = profile:GetDisplayName() or ("Player " .. (index + 1)),
-    dir = profile:GetProfileDir(),
+    dir = profileDir,
     highscore = profile:GetTotalHighScores() or 0
   }
 end
