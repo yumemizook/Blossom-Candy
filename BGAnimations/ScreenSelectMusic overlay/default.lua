@@ -768,12 +768,39 @@ local songInfoPanel = Def.ActorFrame {
       -- Load saved data from BCProfile (profile-specific storage)
       local bcProfile = nil
       local savedEntry = nil
+      
+      -- Validate song and steps exist
+      if not song or not steps then
+        self:GetChild("PBScore"):settext("--")
+        self:GetChild("PBJudgeInfo"):settext("")
+        self:GetChild("PBBP"):settext("")
+        return
+      end
+      
       if LoadBCProfile and BCScoreKey and getCurRateValue then
         bcProfile = LoadBCProfile()
-        local rateStr = string.format("%.2fx", getCurRateValue())
+        local rateVal = getCurRateValue()
+        local rateStr = string.format("%.2fx", rateVal)
         local key = BCScoreKey(song, steps, rateStr)
+        
         if bcProfile and bcProfile.scores then
           savedEntry = bcProfile.scores[key]
+          
+          -- If no entry for exact key, try to find any entry for this chart
+          -- Match on song dir + steps type + difficulty (ignore description and rate)
+          if not savedEntry then
+            local stepsType = tostring(steps:GetStepsType())
+            local diff = tostring(steps:GetDifficulty())
+            for k, v in pairs(bcProfile.scores) do
+              -- Check if key matches song dir, steps type, and difficulty
+              if string.find(k, song:GetSongDir()) 
+                and string.find(k, stepsType)
+                and string.find(k, diff) then
+                savedEntry = v
+                break
+              end
+            end
+          end
         end
       end
 
@@ -808,7 +835,7 @@ local songInfoPanel = Def.ActorFrame {
           scoreText = string.format("%.2f%%", score * 100)
         end
       elseif highScore then
-        -- Fallback: compute from SM highscore (DP-based approximation)
+        -- Fallback: compute from SM highscore (DP-based since SM5 only stores DP)
         local w1 = highScore:GetTapNoteScore("TapNoteScore_W1") or 0
         local w2 = highScore:GetTapNoteScore("TapNoteScore_W2") or 0
         local w3 = highScore:GetTapNoteScore("TapNoteScore_W3") or 0
@@ -819,6 +846,7 @@ local songInfoPanel = Def.ActorFrame {
 
         hasData = true
         if scoringSystem == "Wife3" then
+          -- SM5 only stores DP, but we can use it as a reasonable approximation for Wife3
           score = highScore:GetPercentDP()
         elseif scoringSystem == "EX" then
           if totalNotes > 0 then
@@ -833,6 +861,7 @@ local songInfoPanel = Def.ActorFrame {
         elseif scoringSystem == "ComboOnly" then
           scoreText = highScore:GetMaxCombo() .. "x"
         else
+          -- BC or default: use DP percentage
           score = highScore:GetPercentDP()
         end
         

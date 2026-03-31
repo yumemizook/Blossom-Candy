@@ -92,6 +92,25 @@ end
 -- ============================================================================
 
 -- ============================================================================
+-- Rate Detection
+-- ============================================================================
+
+-- Get the current playback rate from song options
+function getCurRateValue()
+  local rateStr = "1.0"
+  local songOpts = GAMESTATE:GetSongOptionsString()
+  if songOpts then
+    -- Parse rate from options string (e.g., "1.5x Music" -> "1.50")
+    local rateMatch = string.match(songOpts, "(%d+%.?%d*)x")
+    if rateMatch then
+      rateStr = string.format("%.2f", tonumber(rateMatch) or 1.0)
+    end
+  end
+  local rate = tonumber(rateStr) or 1.0
+  return rate
+end
+
+-- ============================================================================
 -- Profile Data Path (Profile-Specific)
 -- ============================================================================
 
@@ -114,22 +133,36 @@ local LEGACY_PROFILE_PATH = "Save/BCProfileData.lua"
 
 function LoadBCProfile()
   local path = GetBCProfileDataPath()
+  Trace("Loading BCProfile from: " .. tostring(path))
+  
+  -- Try to load using loadfile (works with SM5's virtual file system)
   local chunk = loadfile(path)
   if chunk then
-    return chunk()
-  end
-  
-  -- Migration: try legacy path if profile path doesn't exist
-  if path ~= LEGACY_PROFILE_PATH then
-    local legacyChunk = loadfile(LEGACY_PROFILE_PATH)
-    if legacyChunk then
-      local data = legacyChunk()
-      -- Save to new location for future loads
-      SaveBCProfile(data)
-      return data
+    local success, result = pcall(chunk)
+    if success and result then
+      Trace("BCProfile loaded successfully, totalBP: " .. tostring(result.totalBP or 0))
+      return result
     end
   end
   
+  Trace("No BCProfile found at: " .. tostring(path))
+  
+  -- Migration: try legacy path if profile path doesn't exist
+  if path ~= LEGACY_PROFILE_PATH then
+    Trace("Trying legacy path: " .. LEGACY_PROFILE_PATH)
+    local legacyChunk = loadfile(LEGACY_PROFILE_PATH)
+    if legacyChunk then
+      local success, data = pcall(legacyChunk)
+      if success and data then
+        Trace("Found BCProfile at legacy path, migrating...")
+        -- Save to new location for future loads
+        SaveBCProfile(data)
+        return data
+      end
+    end
+  end
+  
+  Trace("Creating new empty BCProfile")
   return { totalBP = 0, scores = {} }
 end
 
