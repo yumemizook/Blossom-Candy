@@ -59,15 +59,26 @@ function create_lua_config(cfg)
     load = function(self)
       self.data = CopyTable(self.default)
       
-      -- Try to load from current profile
       local profileDir = nil
       if PROFILEMAN and GAMESTATE then
         for _, pn in ipairs({PLAYER_1, PLAYER_2}) do
           if PROFILEMAN:IsPersistentProfile(pn) then
-            -- Construct path using player number (API doesn't expose profile ID directly)
-            local playerStr = (pn == PLAYER_1) and "P1" or "P2"
-            profileDir = "Save/LocalProfiles/Player_" .. playerStr
-            break
+            local profile = PROFILEMAN:GetProfile(pn)
+            if profile then
+              if profile.GetProfileDir then
+                profileDir = profile:GetProfileDir()
+                if profileDir and profileDir ~= "" then
+                  break
+                end
+              end
+              if profile.GetLocalProfileID then
+                local id = profile:GetLocalProfileID()
+                if id then
+                  profileDir = "Save/LocalProfiles/" .. id
+                  break
+                end
+              end
+            end
           end
         end
       end
@@ -95,11 +106,24 @@ function create_lua_config(cfg)
       if PROFILEMAN and GAMESTATE then
         for _, pn in ipairs({PLAYER_1, PLAYER_2}) do
           if PROFILEMAN:IsPersistentProfile(pn) then
-            -- Construct path using player number (API doesn't expose profile ID directly)
-            local playerStr = (pn == PLAYER_1) and "P1" or "P2"
-            profileDir = "Save/LocalProfiles/Player_" .. playerStr
-            pn_save = pn
-            break
+            local profile = PROFILEMAN:GetProfile(pn)
+            if profile then
+              if profile.GetProfileDir then
+                profileDir = profile:GetProfileDir()
+                if profileDir and profileDir ~= "" then
+                  pn_save = pn
+                  break
+                end
+              end
+              if profile.GetLocalProfileID then
+                local id = profile:GetLocalProfileID()
+                if id then
+                  profileDir = "Save/LocalProfiles/" .. id
+                  pn_save = pn
+                  break
+                end
+              end
+            end
           end
         end
       end

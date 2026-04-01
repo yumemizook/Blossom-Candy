@@ -118,14 +118,25 @@ local function GetBCProfileDataPath()
   if PROFILEMAN then
     for _, pn in ipairs({PLAYER_1, PLAYER_2}) do
       if PROFILEMAN:IsPersistentProfile(pn) then
-        -- Construct path using player number (API doesn't expose profile ID directly)
-        local playerStr = (pn == PLAYER_1) and "P1" or "P2"
-        return "Save/LocalProfiles/Player_" .. playerStr .. "/BCProfileData.lua"
+        local profile = PROFILEMAN:GetProfile(pn)
+        if profile then
+          if profile.GetProfileDir then
+            local profileDir = profile:GetProfileDir()
+            if profileDir and profileDir ~= "" then
+              return profileDir .. "/BCProfileData.lua"
+            end
+          end
+          if profile.GetLocalProfileID then
+            local id = profile:GetLocalProfileID()
+            if id then
+              return "Save/LocalProfiles/" .. id .. "/BCProfileData.lua"
+            end
+          end
+        end
       end
     end
   end
-  -- Fallback to global Save folder (guest/no profile)
-  return "Save/BCProfileData.lua"
+  return nil
 end
 
 -- Legacy path for migration
@@ -135,31 +146,16 @@ function LoadBCProfile()
   local path = GetBCProfileDataPath()
   Trace("Loading BCProfile from: " .. tostring(path))
   
-  -- Try to load using loadfile (works with SM5's virtual file system)
-  local chunk = loadfile(path)
-  if chunk then
-    local success, result = pcall(chunk)
-    if success and result then
-      Trace("BCProfile loaded successfully, totalBP: " .. tostring(result.totalBP or 0))
-      return result
-    end
-  end
-  
-  Trace("No BCProfile found at: " .. tostring(path))
-  
-  -- Migration: try legacy path if profile path doesn't exist
-  if path ~= LEGACY_PROFILE_PATH then
-    Trace("Trying legacy path: " .. LEGACY_PROFILE_PATH)
-    local legacyChunk = loadfile(LEGACY_PROFILE_PATH)
-    if legacyChunk then
-      local success, data = pcall(legacyChunk)
-      if success and data then
-        Trace("Found BCProfile at legacy path, migrating...")
-        -- Save to new location for future loads
-        SaveBCProfile(data)
-        return data
+  if path then
+    local chunk = loadfile(path)
+    if chunk then
+      local success, result = pcall(chunk)
+      if success and result then
+        Trace("BCProfile loaded successfully, totalBP: " .. tostring(result.totalBP or 0))
+        return result
       end
     end
+    Trace("No BCProfile found at: " .. tostring(path))
   end
   
   Trace("Creating new empty BCProfile")
@@ -168,6 +164,10 @@ end
 
 function SaveBCProfile(profile)
   local path = GetBCProfileDataPath()
+  if not path then
+    Trace("Cannot save BCProfile: no valid profile path")
+    return
+  end
   local f = RageFileUtil.CreateRageFile()
   if not f then return end
   if f:Open(path, 2) then  -- 2 = WRITE

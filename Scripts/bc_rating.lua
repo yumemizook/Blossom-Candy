@@ -101,27 +101,39 @@ local RatingCache = {}
 -- Get the profile-specific path for BCRatingCache.lua
 local function GetBCRatingCachePath()
   if PROFILEMAN then
-    -- Try to get the profile directory from the current player
     for _, pn in ipairs({PLAYER_1, PLAYER_2}) do
       if PROFILEMAN:IsPersistentProfile(pn) then
-        -- Construct path using player number (API doesn't expose profile ID directly)
-        local playerStr = (pn == PLAYER_1) and "P1" or "P2"
-        return "Save/LocalProfiles/Player_" .. playerStr .. "/BCRatingCache.lua"
+        local profile = PROFILEMAN:GetProfile(pn)
+        if profile then
+          if profile.GetProfileDir then
+            local profileDir = profile:GetProfileDir()
+            if profileDir and profileDir ~= "" then
+              return profileDir .. "/BCRatingCache.lua"
+            end
+          end
+          if profile.GetLocalProfileID then
+            local id = profile:GetLocalProfileID()
+            if id then
+              return "Save/LocalProfiles/" .. id .. "/BCRatingCache.lua"
+            end
+          end
+        end
       end
     end
   end
-  -- Fallback to global Save folder if no profile loaded
-  return "Save/BCRatingCache.lua"
+  return nil
 end
 
 function BCLoadRatingCache()
   local cachePath = GetBCRatingCachePath()
-  local chunk = loadfile(cachePath)
-  if chunk then
-    local loaded = chunk()
-    if loaded and type(loaded) == "table" then
-      RatingCache = loaded
-      return
+  if cachePath then
+    local chunk = loadfile(cachePath)
+    if chunk then
+      local loaded = chunk()
+      if loaded and type(loaded) == "table" then
+        RatingCache = loaded
+        return
+      end
     end
   end
   RatingCache = {}
@@ -129,6 +141,7 @@ end
 
 function BCSaveRatingCache()
   local cachePath = GetBCRatingCachePath()
+  if not cachePath then return end
 
   local out = "return {\n"
   for k, v in pairs(RatingCache) do
