@@ -13,6 +13,9 @@ Trace("Blossom-Candy: Loaded bc_scoring.lua")
 dofile(THEME:GetCurrentThemeDirectory() .. "Scripts/bc_prefs.lua")
 Trace("Blossom-Candy: Loaded bc_prefs.lua")
 
+dofile(THEME:GetCurrentThemeDirectory() .. "Scripts/bc_statsxml.lua")
+Trace("Blossom-Candy: Loaded bc_statsxml.lua")
+
 dofile(THEME:GetCurrentThemeDirectory() .. "Scripts/bc_pp.lua")
 Trace("Blossom-Candy: Loaded bc_pp.lua")
 

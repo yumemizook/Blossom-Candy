@@ -55,119 +55,24 @@ function create_lua_config(cfg)
       return self.data[key] or default_value
     end,
     
-    -- Load config from profile directory
+    -- Load config from Stats.xml
     load = function(self)
       self.data = CopyTable(self.default)
       
-      local profileDir = nil
-      if PROFILEMAN and GAMESTATE then
-        for _, pn in ipairs({PLAYER_1, PLAYER_2}) do
-          if PROFILEMAN:IsPersistentProfile(pn) then
-            local profile = PROFILEMAN:GetProfile(pn)
-            if profile then
-              if profile.GetProfileDir then
-                profileDir = profile:GetProfileDir()
-                if profileDir and profileDir ~= "" then
-                  break
-                end
-              end
-              if profile.GetLocalProfileID then
-                local id = profile:GetLocalProfileID()
-                if id then
-                  profileDir = "Save/LocalProfiles/" .. id
-                  break
-                end
-              end
-            end
-          end
-        end
-      end
-      
-      if profileDir then
-        local filepath = profileDir .. "/" .. self.file
-        local chunk = loadfile(filepath)
-        if chunk then
-          local loaded = chunk()
-          if loaded and type(loaded) == "table" then
-            MergeTables(self.data, loaded)
-          end
-        end
+      local data = StatsXML_GetBlossomData()
+      if data and data.playerConfig then
+        MergeTables(self.data, data.playerConfig)
       end
       
       self.loaded = true
       return self.data
     end,
     
-    -- Save config to profile directory
+    -- Save config to Stats.xml
     save = function(self)
-      local profileDir = nil
-      local pn_save = nil
-      
-      if PROFILEMAN and GAMESTATE then
-        for _, pn in ipairs({PLAYER_1, PLAYER_2}) do
-          if PROFILEMAN:IsPersistentProfile(pn) then
-            local profile = PROFILEMAN:GetProfile(pn)
-            if profile then
-              if profile.GetProfileDir then
-                profileDir = profile:GetProfileDir()
-                if profileDir and profileDir ~= "" then
-                  pn_save = pn
-                  break
-                end
-              end
-              if profile.GetLocalProfileID then
-                local id = profile:GetLocalProfileID()
-                if id then
-                  profileDir = "Save/LocalProfiles/" .. id
-                  pn_save = pn
-                  break
-                end
-              end
-            end
-          end
-        end
-      end
-      
-      if not profileDir then return false end
-      
-      local filepath = profileDir .. "/" .. self.file
-      local f = RageFileUtil.CreateRageFile()
-      
-      if f:Open(filepath, RageFile.WRITE) then
-        local function serialize(t, indent)
-          indent = indent or 0
-          local spaces = string.rep("  ", indent)
-          local lines = {}
-          
-          for k, v in pairs(t) do
-            local key = type(k) == "string" and string.format("%q", k) or "[" .. k .. "]"
-            if type(v) == "table" then
-              table.insert(lines, spaces .. key .. " = {")
-              table.insert(lines, serialize(v, indent + 1))
-              table.insert(lines, spaces .. "},")
-            elseif type(v) == "string" then
-              table.insert(lines, spaces .. key .. " = " .. string.format("%q", v) .. ",")
-            elseif type(v) == "boolean" then
-              table.insert(lines, spaces .. key .. " = " .. (v and "true" or "false") .. ",")
-            elseif type(v) == "number" then
-              table.insert(lines, spaces .. key .. " = " .. v .. ",")
-            else
-              table.insert(lines, spaces .. key .. " = " .. string.format("%q", tostring(v)) .. ",")
-            end
-          end
-          
-          return table.concat(lines, "\n")
-        end
-        
-        local out = "return {\n" .. serialize(self.data, 1) .. "}\n"
-        f:Write(out)
-        f:Close()
-        f:destroy()
-        return true
-      end
-      
-      f:destroy()
-      return false
+      local data = StatsXML_GetBlossomData() or {}
+      data.playerConfig = CopyTable(self.data)
+      return StatsXML_SetBlossomData(data)
     end,
     
     -- Reset to defaults
@@ -257,7 +162,6 @@ local defaultPlayerConfig = {
 -- Create global player config
 BCPlayerConfig = create_lua_config({
   name = "BCPlayerConfig",
-  file = "BlossomCandyConfig.lua",
   default = defaultPlayerConfig
 })
 

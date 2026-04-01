@@ -594,15 +594,15 @@ local songInfoPanel = Def.ActorFrame {
       end
     },
 
-    -- Judge/Scoring superscript
-    LoadFont("hatsukoi 48px") .. {
-      Name = "PBJudgeInfo",
+    -- Grade Display
+    LoadFont("hatsukoi Bold 48px") .. {
+      Name = "PBGrade",
       InitCommand = function(self)
-        self:xy(0, 20)
+        self:xy(85, 20)
             :align(0, 0.5)
             :settext("")
-            :diffuse(BCColors.textMuted)
-            :zoom(0.18)
+            :diffuse(color("1,0.85,0.4,1"))
+            :zoom(0.32)
       end
     },
 
@@ -610,7 +610,7 @@ local songInfoPanel = Def.ActorFrame {
     LoadFont("hatsukoi Bold 48px") .. {
       Name = "PBBP",
       InitCommand = function(self)
-        self:xy(140, 20)
+        self:xy(160, 20)
             :align(0, 0.5)
             :settext("")
             :diffuse(BCColors.accent)
@@ -618,132 +618,162 @@ local songInfoPanel = Def.ActorFrame {
       end
     },
 
-    -- Judgement Tally - Compact 2x3 Grid Layout
-    -- Row 1: MA | PR | GR
+    -- Date, Judge Diff, Life Diff (single line below score row)
+    LoadFont("hatsukoi 48px") .. {
+      Name = "PBDate",
+      InitCommand = function(self)
+        self:xy(0, 44)
+            :align(0, 0.5)
+            :settext("")
+            :diffuse(BCColors.textMuted)
+            :zoom(0.18)
+      end
+    },
+    LoadFont("hatsukoi 48px") .. {
+      Name = "PBJudgeDiff",
+      InitCommand = function(self)
+        self:xy(90, 44)
+            :align(0, 0.5)
+            :settext("")
+            :diffuse(BCColors.textMuted)
+            :zoom(0.18)
+      end
+    },
+    LoadFont("hatsukoi 48px") .. {
+      Name = "PBLifeDiff",
+      InitCommand = function(self)
+        self:xy(160, 44)
+            :align(0, 0.5)
+            :settext("")
+            :diffuse(BCColors.textMuted)
+            :zoom(0.18)
+      end
+    },
+
+    -- Judgement Tally - Single Row Layout
     LoadFont("hatsukoi 48px") .. {
       Name = "LabelW1",
       InitCommand = function(self)
-        self:xy(0, 42)
+        self:xy(0, 66)
             :align(0, 0.5)
             :settext("MA")
             :diffuse(color("1,0.85,0.4,1"))
-            :zoom(0.20)
+            :zoom(0.18)
       end
     },
     LoadFont("hatsukoi Bold 48px") .. {
       Name = "ValW1",
       InitCommand = function(self)
-        self:xy(22, 42)
+        self:xy(18, 66)
             :align(0, 0.5)
             :settext("")
             :diffuse(BCColors.text)
-            :zoom(0.24)
+            :zoom(0.20)
       end
     },
 
     LoadFont("hatsukoi 48px") .. {
       Name = "LabelW2",
       InitCommand = function(self)
-        self:xy(70, 42)
+        self:xy(50, 66)
             :align(0, 0.5)
             :settext("PR")
             :diffuse(color("0.9,0.5,0.9,1"))
-            :zoom(0.20)
+            :zoom(0.18)
       end
     },
     LoadFont("hatsukoi Bold 48px") .. {
       Name = "ValW2",
       InitCommand = function(self)
-        self:xy(92, 42)
+        self:xy(68, 66)
             :align(0, 0.5)
             :settext("")
             :diffuse(BCColors.text)
-            :zoom(0.24)
+            :zoom(0.20)
       end
     },
 
     LoadFont("hatsukoi 48px") .. {
       Name = "LabelW3",
       InitCommand = function(self)
-        self:xy(140, 42)
+        self:xy(100, 66)
             :align(0, 0.5)
             :settext("GR")
             :diffuse(color("0.2,0.8,0.4,1"))
-            :zoom(0.20)
+            :zoom(0.18)
       end
     },
     LoadFont("hatsukoi Bold 48px") .. {
       Name = "ValW3",
       InitCommand = function(self)
-        self:xy(162, 42)
+        self:xy(118, 66)
             :align(0, 0.5)
             :settext("")
             :diffuse(BCColors.text)
-            :zoom(0.24)
+            :zoom(0.20)
       end
     },
 
-    -- Row 2: GD | BD | MS
     LoadFont("hatsukoi 48px") .. {
       Name = "LabelW4",
       InitCommand = function(self)
-        self:xy(0, 58)
+        self:xy(150, 66)
             :align(0, 0.5)
             :settext("GD")
             :diffuse(color("0.3,0.6,0.9,1"))
-            :zoom(0.20)
+            :zoom(0.18)
       end
     },
     LoadFont("hatsukoi Bold 48px") .. {
       Name = "ValW4",
       InitCommand = function(self)
-        self:xy(22, 58)
+        self:xy(168, 66)
             :align(0, 0.5)
             :settext("")
             :diffuse(BCColors.text)
-            :zoom(0.24)
+            :zoom(0.20)
       end
     },
 
     LoadFont("hatsukoi 48px") .. {
       Name = "LabelW5",
       InitCommand = function(self)
-        self:xy(70, 58)
+        self:xy(200, 66)
             :align(0, 0.5)
             :settext("BD")
             :diffuse(color("0.9,0.4,0.2,1"))
-            :zoom(0.20)
+            :zoom(0.18)
       end
     },
     LoadFont("hatsukoi Bold 48px") .. {
       Name = "ValW5",
       InitCommand = function(self)
-        self:xy(92, 58)
+        self:xy(218, 66)
             :align(0, 0.5)
             :settext("")
             :diffuse(BCColors.text)
-            :zoom(0.24)
+            :zoom(0.20)
       end
     },
 
     LoadFont("hatsukoi 48px") .. {
       Name = "LabelMiss",
       InitCommand = function(self)
-        self:xy(140, 58)
+        self:xy(250, 66)
             :align(0, 0.5)
             :settext("MS")
             :diffuse(color("0.7,0.2,0.2,1"))
-            :zoom(0.20)
+            :zoom(0.18)
       end
     },
     LoadFont("hatsukoi Bold 48px") .. {
       Name = "ValMiss",
       InitCommand = function(self)
-        self:xy(162, 58)
+        self:xy(268, 66)
             :align(0, 0.5)
             :settext("")
             :diffuse(BCColors.text)
-            :zoom(0.24)
+            :zoom(0.20)
       end
     },
 
@@ -754,8 +784,11 @@ local songInfoPanel = Def.ActorFrame {
 
       if not song or not steps then
         self:GetChild("PBScore"):settext("--")
-        self:GetChild("PBJudgeInfo"):settext("")
+        self:GetChild("PBGrade"):settext("")
         self:GetChild("PBBP"):settext("")
+        self:GetChild("PBDate"):settext("")
+        self:GetChild("PBJudgeDiff"):settext("")
+        self:GetChild("PBLifeDiff"):settext("")
         self:GetChild("ValW1"):settext("")
         self:GetChild("ValW2"):settext("")
         self:GetChild("ValW3"):settext("")
@@ -772,8 +805,11 @@ local songInfoPanel = Def.ActorFrame {
       -- Validate song and steps exist
       if not song or not steps then
         self:GetChild("PBScore"):settext("--")
-        self:GetChild("PBJudgeInfo"):settext("")
+        self:GetChild("PBGrade"):settext("")
         self:GetChild("PBBP"):settext("")
+        self:GetChild("PBDate"):settext("")
+        self:GetChild("PBJudgeDiff"):settext("")
+        self:GetChild("PBLifeDiff"):settext("")
         return
       end
       
@@ -872,15 +908,12 @@ local songInfoPanel = Def.ActorFrame {
 
       self:GetChild("PBScore"):settext(scoreText)
 
-      -- Calculate width for superscript positioning
-      local scoreWidth = self:GetChild("PBScore"):GetWidth() * 0.40
-
-      -- Get judge and scoring info from theme preferences
-      local judgeInfo = BCPrefs.scoringSystem or "BC"
-
-      local judgeActor = self:GetChild("PBJudgeInfo")
-      judgeActor:settext(judgeInfo)
-      judgeActor:x(scoreWidth + 6)
+      -- Display grade from saved entry
+      local gradeText = ""
+      if savedEntry and savedEntry.grade then
+        gradeText = savedEntry.grade
+      end
+      self:GetChild("PBGrade"):settext(gradeText)
 
       -- Load saved BP from BCProfileData (if available)
       local bp = 0
@@ -888,6 +921,25 @@ local songInfoPanel = Def.ActorFrame {
         bp = math.floor(savedEntry.rawBP or 0)
       end
       self:GetChild("PBBP"):settext(tostring(bp))
+
+      -- Display date, judge diff, life diff from saved entry
+      local dateText = ""
+      local judgeDiffText = ""
+      local lifeDiffText = ""
+      if savedEntry then
+        if savedEntry.date then
+          dateText = savedEntry.date
+        end
+        if savedEntry.judgeDiff then
+          judgeDiffText = "JD:" .. savedEntry.judgeDiff
+        end
+        if savedEntry.lifeDiff then
+          lifeDiffText = "LD:" .. savedEntry.lifeDiff .. "%"
+        end
+      end
+      self:GetChild("PBDate"):settext(dateText)
+      self:GetChild("PBJudgeDiff"):settext(judgeDiffText)
+      self:GetChild("PBLifeDiff"):settext(lifeDiffText)
 
       -- Display judgment tallies from saved data or highscore
       if savedEntry then

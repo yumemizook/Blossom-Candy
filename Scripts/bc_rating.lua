@@ -93,80 +93,24 @@ function BCChartKey(song, steps)
 end
 
 -- ============================================================================
--- Rating Cache Persistence (Profile-Specific)
+-- Rating Cache Persistence (via Stats.xml)
 -- ============================================================================
 
 local RatingCache = {}
 
--- Get the profile-specific path for BCRatingCache.lua
-local function GetBCRatingCachePath()
-  if PROFILEMAN then
-    for _, pn in ipairs({PLAYER_1, PLAYER_2}) do
-      if PROFILEMAN:IsPersistentProfile(pn) then
-        local profile = PROFILEMAN:GetProfile(pn)
-        if profile then
-          if profile.GetProfileDir then
-            local profileDir = profile:GetProfileDir()
-            if profileDir and profileDir ~= "" then
-              return profileDir .. "/BCRatingCache.lua"
-            end
-          end
-          if profile.GetLocalProfileID then
-            local id = profile:GetLocalProfileID()
-            if id then
-              return "Save/LocalProfiles/" .. id .. "/BCRatingCache.lua"
-            end
-          end
-        end
-      end
-    end
-  end
-  return nil
-end
-
 function BCLoadRatingCache()
-  local cachePath = GetBCRatingCachePath()
-  if cachePath then
-    local chunk = loadfile(cachePath)
-    if chunk then
-      local loaded = chunk()
-      if loaded and type(loaded) == "table" then
-        RatingCache = loaded
-        return
-      end
-    end
+  local data = StatsXML_GetBlossomData()
+  if data and data.ratingCache then
+    RatingCache = data.ratingCache
+  else
+    RatingCache = {}
   end
-  RatingCache = {}
 end
 
 function BCSaveRatingCache()
-  local cachePath = GetBCRatingCachePath()
-  if not cachePath then return end
-
-  local out = "return {\n"
-  for k, v in pairs(RatingCache) do
-    local key = string.format("%q", k)
-    if type(v) == "table" and v.Overall then
-      out = out .. string.format("  [%s] = {\n", key)
-      out = out .. string.format("    Overall = %.4f,\n", v.Overall)
-      out = out .. string.format("    Stream = %.4f,\n", v.Stream or 1.0)
-      out = out .. string.format("    Jumpstream = %.4f,\n", v.Jumpstream or 1.0)
-      out = out .. string.format("    Handstream = %.4f,\n", v.Handstream or 1.0)
-      out = out .. string.format("    Jackseed = %.4f,\n", v.Jackseed or 1.0)
-      out = out .. string.format("    Chordjack = %.4f,\n", v.Chordjack or 1.0)
-      out = out .. string.format("    Technical = %.4f,\n", v.Technical or 1.0)
-      out = out .. string.format("    Stamina = %.4f\n", v.Stamina or 1.0)
-      out = out .. "  },\n"
-    end
-  end
-  out = out .. "}\n"
-
-  local f = RageFileUtil.CreateRageFile()
-  if f:Open(cachePath, 2) then -- 2 = WRITE
-    f:Write(out)
-    f:Close()
-  end
-  f:destroy()
+  local data = StatsXML_GetBlossomData() or {}
+  data.ratingCache = RatingCache
+  StatsXML_SetBlossomData(data)
 end
 
 function BCGetCachedRating(chartKey)
@@ -182,7 +126,6 @@ function BCSetCachedRating(chartKey, ratingTable)
   end
 end
 
--- Load cache on startup
 BCLoadRatingCache()
 
 -- ============================================================================

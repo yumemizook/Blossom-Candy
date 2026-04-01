@@ -54,8 +54,7 @@ function BCProfile:AutoSelectProfile(pn)
     local profile = self:GetProfileInfo(0)
     if profile then
       PROFILEMAN:LoadLocalProfile(pn, profile.id)
-      -- Load config after profile is loaded
-      BCLuaConfig_LoadAll()
+      StatsXML_OnProfileChanged()
       return profile
     end
   end
@@ -67,8 +66,7 @@ function BCProfile:LoadProfileByIndex(pn, index)
   local profile = self:GetProfileInfo(index)
   if profile then
     PROFILEMAN:LoadLocalProfile(pn, profile.id)
-    -- Load config after profile is loaded
-    BCLuaConfig_LoadAll()
+    StatsXML_OnProfileChanged()
     return profile
   end
   return nil
@@ -76,7 +74,7 @@ end
 
 -- Get the currently loaded profile for a player
 function BCProfile:GetCurrentProfile(pn)
-  if PROFILEMAN and PROFILEMAN:IsPersistentProfile(pn) then
+  if PROFILEMAN then
     return PROFILEMAN:GetProfile(pn)
   end
   return nil
@@ -85,14 +83,15 @@ end
 -- Check if a profile is loaded for a player
 function BCProfile:HasProfileLoaded(pn)
   if PROFILEMAN then
-    return PROFILEMAN:IsPersistentProfile(pn)
+    local profile = PROFILEMAN:GetProfile(pn)
+    return profile ~= nil
   end
   return false
 end
 
 -- Save profile to disk (config is auto-saved via hooks)
 function BCProfile:SaveProfile(pn)
-  if PROFILEMAN and PROFILEMAN:IsPersistentProfile(pn) then
+  if PROFILEMAN and PROFILEMAN:GetProfile(pn) then
     PROFILEMAN:SaveLocalProfile(pn)
   end
 end
